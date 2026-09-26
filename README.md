@@ -25,6 +25,13 @@ The logo is a ranked list in miniature: three routes, shortest at the bottom, wi
 - `src/lib/snapshot.ts` queries every provider in parallel, caps each one at 20s, drops rates that are more than 10% away from mid-market (a sign the response format changed), and records failures without breaking the rest.
 - `/api/rates` serves that check with a 2-minute cache: Vercel's CDN shares one response across visitors, and each server instance keeps its latest result in memory, so providers are asked at most about once every 2 minutes however busy the site gets. The page calls it on load and when you press Refresh, and a yellow banner suggests refreshing once the rates on screen are 10 minutes old.
 - Amounts are compared for the same total spend: the fee comes out of what you pay, and the rest is converted.
+- The amount and payout method are kept in the address (`?amount=500&method=wallet`), so a comparison can be shared as a link.
+
+### Rate history and provider health
+
+`.github/workflows/rate-history.yml` runs every hour. It reads the live site's `/api/rates` (so it adds no load on providers), appends each provider's headline rate to [`history.json` on the `data` branch](../../blob/data/history.json), and keeps 30 days. The page shows the last 7 days as a trend per provider, served through `/api/history`.
+
+The same job watches provider health: if a provider fails every check for 6 hours, it opens a GitHub issue labelled `provider-health`, and closes it when the provider answers again.
 
 Some services are covered through another source when their own calculator is unavailable:
 

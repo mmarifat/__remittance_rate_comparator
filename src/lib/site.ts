@@ -12,6 +12,9 @@ export const SITE_URL =
 
 export const REPO_URL = "https://github.com/mmarifat/__remittance_rate_comparator";
 
+/** Hourly rate history, written by .github/workflows/rate-history.yml to the `data` branch. */
+export const HISTORY_URL = "https://raw.githubusercontent.com/mmarifat/__remittance_rate_comparator/data/history.json";
+
 export const AUTHOR = {
   name: "Md Minhaz Ahamed Rifat",
   github: "https://github.com/mmarifat",

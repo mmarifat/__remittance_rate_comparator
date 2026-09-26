@@ -2,7 +2,7 @@
 
 Thanks for helping people get more taka for their pounds. The most useful contributions are:
 
-- **Fixing a broken provider.** Providers change their websites, and a provider that stops answering shows up under "Couldn't check just now".
+- **Fixing a broken provider.** Providers change their websites, and a provider that stops answering shows up under "Couldn't check just now". After 6 hours of failures, an issue labelled [`provider-health`](../../issues?q=label%3Aprovider-health) opens automatically; those are good first issues.
 - **Adding a provider** that sends money from the UK to Bangladesh.
 - **Improving the page**: accessibility, layout, wording.
 

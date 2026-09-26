@@ -2,12 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { availableMethods, buildOffers, mostTaka, type Offer } from "@/lib/compare";
+import {
+  appendRecord,
+  bestRateTrend,
+  providerTrend,
+  toRecord,
+  type History,
+  type HistoryRecord,
+  type TrendPoint,
+} from "@/lib/history";
 import { formatAgo, formatBdt, formatGbp, formatRate } from "@/lib/format";
-import { AUTHOR, REPO_URL } from "@/lib/site";
+import { AUTHOR, REPO_URL, SITE_NAME } from "@/lib/site";
 import type { DeliveryMethod, RatesSnapshot } from "@/lib/types";
 import Image from "next/image";
 import { Rosette, Waves } from "./Guilloche";
 import { ProviderLogo } from "./ProviderLogo";
+import { Sparkline } from "./Sparkline";
 import { useNow } from "./useNow";
 
 const METHOD_LABEL: Record<DeliveryMethod, string> = {
@@ -31,17 +41,49 @@ const MAX_AMOUNT = 100_000;
 /** After this long, a banner suggests refreshing because providers may have moved their rates. */
 const STALE_AFTER_MINUTES = 10;
 
-// rank · logo · service · rate · fee · recipient gets
-const ROW_GRID =
-  "grid grid-cols-[1.75rem_2.25rem_minmax(0,1fr)_auto] items-center gap-x-3 sm:grid-cols-[2rem_2.5rem_minmax(0,1fr)_6.5rem_5rem_8.5rem] sm:gap-x-4";
+// rank · logo · service · [7-day trend] · rate · fee · recipient gets. The trend column only
+// appears once there is history to show.
+function rowGrid(trends: boolean) {
+  return `grid grid-cols-[1.75rem_2.25rem_minmax(0,1fr)_auto] items-center gap-x-3 sm:gap-x-4 ${
+    trends
+      ? "sm:grid-cols-[2rem_2.5rem_minmax(0,1fr)_4.5rem_5.5rem_4rem_7.5rem]"
+      : "sm:grid-cols-[2rem_2.5rem_minmax(0,1fr)_6.5rem_5rem_8.5rem]"
+  }`;
+}
 
 const CHIP =
   "inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1 text-sm transition hover:border-brand";
 
-export function RateComparer({ providerCount }: { providerCount: number }) {
+export const DEFAULT_AMOUNT = "1000";
+export const DEFAULT_METHOD: DeliveryMethod = "bank";
+
+/** Accepts what the amount field accepts: up to 6 digits, 2 decimals, at most MAX_AMOUNT. */
+export function isValidAmount(text: string): boolean {
+  return /^\d{0,6}(\.\d{0,2})?$/.test(text) && Number(text) <= MAX_AMOUNT;
+}
+
+// The amount and payout method live in the address, so a comparison can be shared as a link.
+function syncUrl(amount: string, method: DeliveryMethod) {
+  const params = new URLSearchParams();
+  if (amount !== DEFAULT_AMOUNT) params.set("amount", amount);
+  if (method !== DEFAULT_METHOD) params.set("method", method);
+  const query = params.toString();
+  window.history.replaceState(null, "", query ? `?${query}` : window.location.pathname);
+}
+
+export function RateComparer({
+  providerCount,
+  initialAmount = DEFAULT_AMOUNT,
+  initialMethod = DEFAULT_METHOD,
+}: {
+  providerCount: number;
+  initialAmount?: string;
+  initialMethod?: DeliveryMethod;
+}) {
   const [snapshot, setSnapshot] = useState<RatesSnapshot | null>(null);
-  const [amountText, setAmountText] = useState("1000");
-  const [method, setMethod] = useState<DeliveryMethod>("bank");
+  const [amountText, setAmountText] = useState(initialAmount);
+  const [method, setMethodState] = useState<DeliveryMethod>(initialMethod);
+  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const now = useNow();
@@ -51,6 +93,16 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
   const activeMethod = methods.includes(method) ? method : (methods[0] ?? "bank");
   const offers = snapshot ? buildOffers(snapshot, amount, activeMethod) : [];
   const mostTakaId = offers.length > 1 ? mostTaka(offers)?.provider.id : undefined;
+
+  // Hourly history plus the rates on screen, so each trend ends at "now".
+  const [history, setHistory] = useState<HistoryRecord[]>([]);
+  const records = snapshot ? appendRecord(history, toRecord(snapshot)) : history;
+  const trends = new Map(
+    now === null ? [] : offers.map((o) => [o.provider.id, providerTrend(records, o.provider.id, now)] as const),
+  );
+  const showTrends = [...trends.values()].some((t) => t.length > 1);
+  const bestTrend = now === null ? [] : bestRateTrend(records, now);
+  const trendDays = bestTrend.length > 1 ? Math.round((bestTrend.at(-1)!.t - bestTrend[0].t) / 86_400_000) : 0;
 
   const failed = snapshot?.providers.filter((p) => p.status === "error") ?? [];
   const noMethod =
@@ -62,6 +114,17 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
 
   // Every load asks each provider for a live quote; nothing is cached on the server.
   // Bumping `requestId` (the Refresh button) runs the effect again.
+  useEffect(() => {
+    let current = true;
+    fetch("/api/history")
+      .then((res) => (res.ok ? (res.json() as Promise<History>) : { records: [] }))
+      .then((h) => current && setHistory(h.records))
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, []);
+
   const [requestId, setRequestId] = useState(0);
   useEffect(() => {
     let current = true;
@@ -89,8 +152,34 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
 
   function onAmountChange(value: string) {
     const cleaned = value.replace(/[^\d.]/g, "");
-    if (!/^\d{0,6}(\.\d{0,2})?$/.test(cleaned) || Number(cleaned) > MAX_AMOUNT) return;
+    if (!isValidAmount(cleaned)) return;
     setAmountText(cleaned);
+    syncUrl(cleaned, activeMethod);
+  }
+
+  function setMethod(m: DeliveryMethod) {
+    setMethodState(m);
+    syncUrl(amountText, m);
+  }
+
+  async function share() {
+    const url = window.location.href;
+    const best = offers[0];
+    const text = best
+      ? `Sending ${formatGbp(amount)} to Bangladesh? ${best.provider.name} has the best rate right now: ${formatRate(best.quote.rate)}.`
+      : `Compare GBP to BDT transfer rates.`;
+    // Phones get the native share sheet (WhatsApp etc.); desktops copy the link.
+    if (navigator.share && window.matchMedia("(pointer: coarse)").matches) {
+      await navigator.share({ title: SITE_NAME, text, url }).catch(() => {});
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.prompt("Copy this link", url);
+    }
   }
 
   return (
@@ -201,6 +290,10 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
               <span className="figure text-base font-semibold text-ink">{formatRate(snapshot.midMarket)}</span>
             </p>
           )}
+          <button type="button" onClick={share} className={`${CHIP} ml-auto font-medium`}>
+            <ShareIcon />
+            <span aria-live="polite">{copied ? "Link copied" : "Share"}</span>
+          </button>
         </div>
       </section>
 
@@ -219,13 +312,16 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
           </p>
         </div>
 
+        {trendDays >= 1 && <BestRateSummary points={bestTrend} days={Math.min(trendDays, 7)} />}
+
         {offers.length > 0 && (
           <div
-            className={`${ROW_GRID} hidden px-3 pb-1 pt-4 text-xs font-medium uppercase tracking-wider text-muted sm:grid`}
+            className={`${rowGrid(showTrends)} hidden px-3 pb-1 pt-4 text-xs font-medium uppercase tracking-wider text-muted sm:grid`}
           >
             <span />
             <span />
             <span>Service</span>
+            {showTrends && <span>7 days</span>}
             <span className="text-right">Rate</span>
             <span className="text-right">Fee</span>
             <span className="text-right">Recipient gets</span>
@@ -234,7 +330,13 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
 
         <ol className="mt-2 flex flex-col gap-1">
           {offers.map((offer, i) => (
-            <OfferRow key={offer.provider.id} offer={offer} rank={i + 1} isMostTaka={offer.provider.id === mostTakaId} />
+            <OfferRow
+              key={offer.provider.id}
+              offer={offer}
+              rank={i + 1}
+              isMostTaka={offer.provider.id === mostTakaId}
+              trend={showTrends ? (trends.get(offer.provider.id) ?? []) : undefined}
+            />
           ))}
         </ol>
 
@@ -337,7 +439,18 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
   );
 }
 
-function OfferRow({ offer, rank, isMostTaka }: { offer: Offer; rank: number; isMostTaka: boolean }) {
+function OfferRow({
+  offer,
+  rank,
+  isMostTaka,
+  trend,
+}: {
+  offer: Offer;
+  rank: number;
+  isMostTaka: boolean;
+  /** Set when the trend column is shown; may be too short to draw for a provider. */
+  trend?: TrendPoint[];
+}) {
   const { provider, quote } = offer;
   const top = rank === 1;
   const fee = quote.fee ? `${formatGbp(quote.fee)} fee` : "No fee";
@@ -357,7 +470,7 @@ function OfferRow({ offer, rank, isMostTaka }: { offer: Offer; rank: number; isM
         href={provider.url}
         target="_blank"
         rel="noopener noreferrer"
-        className={`${ROW_GRID} group rounded-2xl px-3 transition ${top ? "py-6 focus-visible:outline-note-ink" : "py-4 hover:bg-card"}`}
+        className={`${rowGrid(trend !== undefined)} group rounded-2xl px-3 transition ${top ? "py-6 focus-visible:outline-note-ink" : "py-4 hover:bg-card"}`}
       >
         <span
           className={`figure grid place-items-center rounded-full font-semibold ${
@@ -375,7 +488,7 @@ function OfferRow({ offer, rank, isMostTaka }: { offer: Offer; rank: number; isM
             <span className={`font-semibold ${top ? "text-lg" : ""}`}>{provider.name}</span>
             {isMostTaka && (
               <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${top ? "bg-note-ink/15" : "bg-green-soft text-brand"}`}
+                className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${top ? "bg-note-ink/15" : "bg-green-soft text-brand"}`}
               >
                 Most taka after fees
               </span>
@@ -389,6 +502,12 @@ function OfferRow({ offer, rank, isMostTaka }: { offer: Offer; rank: number; isM
             {provider.note}
           </span>
         </span>
+
+        {trend !== undefined && (
+          <span className="hidden sm:block">
+            <Sparkline points={trend} onNote={top} />
+          </span>
+        )}
 
         <span className={`figure text-right font-semibold ${top ? "text-3xl sm:text-4xl" : "text-2xl"}`}>
           {formatRate(quote.rate)}
@@ -435,13 +554,36 @@ function CurrencySelect({ label, options }: { label: string; options: { code: st
   );
 }
 
+/** Answers "is today a good day to send?" by placing the current best rate in its recent range. */
+function BestRateSummary({ points, days }: { points: TrendPoint[]; days: number }) {
+  const rates = points.map((p) => p.rate);
+  const now = rates.at(-1)!;
+  const lo = Math.min(...rates);
+  const hi = Math.max(...rates);
+  const span = days === 1 ? "day" : `${days} days`;
+  const text =
+    hi === lo
+      ? `The best rate hasn't moved in the last ${span}.`
+      : now >= hi
+        ? `Today's best rate is the highest in the last ${span}.`
+        : now <= lo
+          ? `Today's best rate is the lowest in the last ${span}.`
+          : `Best rate over the last ${span}: ${formatRate(lo)} to ${formatRate(hi)}.`;
+  return (
+    <p className="flex items-center gap-3 px-3 pt-4 text-sm text-muted">
+      <Sparkline points={points} />
+      {text}
+    </p>
+  );
+}
+
 function LoadingRows({ providerCount }: { providerCount: number }) {
   return (
     <div aria-busy="true">
       <p className="px-3 pb-2 pt-4 text-sm text-muted">Getting live quotes from {providerCount} services…</p>
       <ul aria-hidden="true" className="flex flex-col gap-1">
         {Array.from({ length: 6 }, (_, i) => (
-          <li key={i} className={`${ROW_GRID} border-b border-line px-3 py-4`}>
+          <li key={i} className={`${rowGrid(false)} border-b border-line px-3 py-4`}>
             <span className="mx-auto size-2 rounded-full bg-line" />
             <span className="size-9 rounded-xl bg-line motion-safe:animate-pulse" />
             <span className="flex flex-col gap-2">
@@ -462,6 +604,24 @@ function GitHubIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z" />
+    </svg>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 3v12M7 8l5-5 5 5M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" />
     </svg>
   );
 }

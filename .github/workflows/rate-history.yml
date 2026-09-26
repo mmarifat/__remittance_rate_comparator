@@ -1,0 +1,46 @@
+name: Rate history
+
+# Every hour: record the live site's rates on the `data` branch, and open or close
+# provider-health issues. Reading the live API adds no extra load on providers.
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency: rate-history
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+
+      - name: Check out the data branch
+        run: |
+          if git fetch origin data:data; then
+            git worktree add data-branch data
+          else
+            git worktree add --orphan -b data data-branch
+          fi
+
+      - name: Record rates and update provider-health issues
+        run: bun scripts/record-rates.ts data-branch/history.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit history
+        working-directory: data-branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add history.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Record rates"
+            git push origin data
+          fi
