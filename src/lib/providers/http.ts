@@ -1,9 +1,12 @@
+import { REPO_URL, SITE_NAME } from "../site";
 import type { Quote } from "../types";
 
-const BROWSER_HEADERS = {
+const DEFAULT_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
   "Accept-Language": "en-GB,en;q=0.9",
+  // Tells providers who is asking: an open source comparison site, with a link to its code.
+  "X-Open-Source-Client": `${SITE_NAME} (+${REPO_URL})`,
 };
 
 const TIMEOUT_MS = 10_000;
@@ -12,7 +15,7 @@ const TIMEOUT_MS = 10_000;
 export async function request(url: string, init: RequestInit = {}, retried = false): Promise<Response> {
   const res = await fetch(url, {
     ...init,
-    headers: { ...BROWSER_HEADERS, ...init.headers },
+    headers: { ...DEFAULT_HEADERS, ...init.headers },
     signal: AbortSignal.timeout(TIMEOUT_MS),
     cache: "no-store",
   });

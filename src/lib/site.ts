@@ -10,6 +10,8 @@ export const SITE_URL =
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : "http://localhost:3000");
 
+export const REPO_URL = "https://github.com/mmarifat/__remittance_rate_comparator";
+
 export const AUTHOR = {
   name: "Md Minhaz Ahamed Rifat",
   github: "https://github.com/mmarifat",

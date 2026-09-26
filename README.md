@@ -35,9 +35,11 @@ bun run check:providers  # query every provider once and print the results
 
 `vercel.json` pins functions to London (`lhr1`) because some providers price by the caller's location.
 
-## Adding a provider
+## Contributing
 
-Create `src/lib/providers/<name>.ts` exporting a `ProviderDef`, add it to the list in `src/lib/providers/index.ts`, and run `bun run check:providers`.
+Contributions are welcome, especially fixing a provider that stopped working or adding a new one. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, a provider template, and the ground rules.
+
+Every request to a provider carries an `X-Open-Source-Client: Remittance Rate Comparator (+https://github.com/mmarifat/__remittance_rate_comparator)` header, so providers can see who is asking and where the code lives.
 
 ## Caveats
 
@@ -51,3 +53,7 @@ Create `src/lib/providers/<name>.ts` exporting a `ProviderDef`, add it to the li
 ## Author
 
 Made by **Md Minhaz Ahamed Rifat**: [GitHub](https://github.com/mmarifat) · [LinkedIn](https://www.linkedin.com/in/mmarifat6/)
+
+## License
+
+[MIT](LICENSE)

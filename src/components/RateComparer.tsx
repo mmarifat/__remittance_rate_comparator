@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { availableMethods, buildOffers, mostTaka, type Offer } from "@/lib/compare";
 import { formatAgo, formatBdt, formatGbp, formatRate } from "@/lib/format";
-import { AUTHOR } from "@/lib/site";
+import { AUTHOR, REPO_URL } from "@/lib/site";
 import type { DeliveryMethod, RatesSnapshot } from "@/lib/types";
 import { Rosette, Waves } from "./Guilloche";
 import { ProviderLogo } from "./ProviderLogo";
@@ -20,6 +20,10 @@ const METHOD_PAYOUT: Record<DeliveryMethod, string> = {
   wallet: "bKash / wallet payout",
   cash: "cash pickup",
 };
+
+// Only one corridor is supported so far; add currencies here as providers support them.
+const SEND_CURRENCIES = [{ code: "GBP", name: "Pound" }];
+const RECEIVE_CURRENCIES = [{ code: "BDT", name: "Taka" }];
 
 const MAX_AMOUNT = 100_000;
 
@@ -135,12 +139,13 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
       )}
 
       <section className="rise pb-6 pt-6 sm:pt-10">
-        <p className="mb-3 flex items-center gap-2 text-sm text-muted">
-          <span className="figure-wide rounded-full border border-line bg-card px-3 py-0.5 font-semibold text-ink">
-            GBP → BDT
+        <div className="mb-4 flex items-center gap-2">
+          <CurrencySelect label="You send" options={SEND_CURRENCIES} />
+          <span aria-hidden="true" className="text-muted">
+            →
           </span>
-          UK to Bangladesh is the only route for now
-        </p>
+          <CurrencySelect label="They receive" options={RECEIVE_CURRENCIES} />
+        </div>
         <h1 className="font-display text-[clamp(2.1rem,6vw,3.4rem)] font-semibold leading-[1.02] tracking-tight">
           Send{" "}
           <label className="inline-flex items-baseline whitespace-nowrap">
@@ -297,12 +302,26 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
           <p>
-            Made by <span className="font-medium text-ink">{AUTHOR.name}</span>
+            Made by <span className="font-medium text-ink">{AUTHOR.name}</span>. Open source:{" "}
+            <a
+              href={`${REPO_URL}/blob/main/CONTRIBUTING.md`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-flag-green"
+            >
+              add a provider or fix one
+            </a>
+            .
           </p>
           <ul className="flex gap-2">
             <li>
               <a href={AUTHOR.github} target="_blank" rel="noopener noreferrer" className={CHIP}>
                 <GitHubIcon /> GitHub
+              </a>
+            </li>
+            <li>
+              <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className={CHIP}>
+                <CodeIcon /> Source
               </a>
             </li>
             <li>
@@ -384,6 +403,37 @@ function OfferRow({ offer, rank, isMostTaka }: { offer: Offer; rank: number; isM
   );
 }
 
+function CurrencySelect({ label, options }: { label: string; options: { code: string; name: string }[] }) {
+  return (
+    <label className="relative inline-flex items-center">
+      <span className="sr-only">{label}</span>
+      <select
+        defaultValue={options[0].code}
+        className="figure-wide cursor-pointer appearance-none rounded-full border border-line bg-card py-1.5 pl-3.5 pr-8 text-sm font-semibold text-ink transition hover:border-flag-green"
+      >
+        {options.map((c) => (
+          <option key={c.code} value={c.code}>
+            {c.code} · {c.name}
+          </option>
+        ))}
+      </select>
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        aria-hidden="true"
+        className="pointer-events-none absolute right-3 text-muted"
+      >
+        <path d="m6 9 6 6 6-6" />
+      </svg>
+    </label>
+  );
+}
+
 function LoadingRows({ providerCount }: { providerCount: number }) {
   return (
     <div aria-busy="true">
@@ -411,6 +461,24 @@ function GitHubIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z" />
+    </svg>
+  );
+}
+
+function CodeIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />
     </svg>
   );
 }

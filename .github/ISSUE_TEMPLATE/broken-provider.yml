@@ -1,0 +1,23 @@
+name: Broken provider
+description: A provider shows no rate, or a wrong one
+labels: ["provider", "bug"]
+body:
+  - type: input
+    id: provider
+    attributes:
+      label: Provider
+      placeholder: e.g. Remitly
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What's wrong?
+      description: For example, it's under "Couldn't check just now", or the rate doesn't match their website.
+    validations:
+      required: true
+  - type: input
+    id: seen
+    attributes:
+      label: Rate on their website, if different
+      placeholder: e.g. 162.50 with a £0.99 fee

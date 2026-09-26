@@ -1,0 +1,25 @@
+name: New provider
+description: Suggest a money transfer service to add
+labels: ["provider", "enhancement"]
+body:
+  - type: input
+    id: provider
+    attributes:
+      label: Provider name
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Their UK to Bangladesh page
+      placeholder: https://
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: They send money from the UK to Bangladesh
+          required: true
+        - label: I'd like to add it myself (see CONTRIBUTING.md)
