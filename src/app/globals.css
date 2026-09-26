@@ -6,9 +6,9 @@
   --ink: #0f2a22;
   --muted: #5b6f67;
   --line: #d3ded8;
-  --flag-green: #006a4e;
+  --brand: #006a4e;
   --green-soft: #dcebe4;
-  --flag-red: #f42a41;
+  --gold: #f5c04a;
   --note: #006a4e;
   --note-ink: #eef7f2;
   --note-line: rgb(238 247 242 / 0.22);
@@ -24,9 +24,9 @@
     --ink: #e4eee9;
     --muted: #8aa197;
     --line: #1f3a31;
-    --flag-green: #3dbe8b;
+    --brand: #3dbe8b;
     --green-soft: #143328;
-    --flag-red: #ff4d5e;
+    --gold: #f5c04a;
     --note: #0b4f3b;
     --note-ink: #e8f4ee;
     --note-line: rgb(232 244 238 / 0.16);
@@ -42,9 +42,9 @@
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-line: var(--line);
-  --color-flag-green: var(--flag-green);
+  --color-brand: var(--brand);
   --color-green-soft: var(--green-soft);
-  --color-flag-red: var(--flag-red);
+  --color-gold: var(--gold);
   --color-note: var(--note);
   --color-note-ink: var(--note-ink);
   --color-warn-bg: var(--warn-bg);
@@ -74,7 +74,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--flag-green);
+  outline: 2px solid var(--brand);
   outline-offset: 3px;
   border-radius: 4px;
 }

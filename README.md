@@ -1,6 +1,22 @@
-# Remittance Rate Comparator
+<p align="center">
+  <img src="public/logo.svg" alt="Remittance Rate Comparator logo" width="96" height="96">
+</p>
 
-Live GBP → BDT remittance rates, the only corridor for now. Compares what 21 money transfer services give for pounds sent to Bangladesh, ranked from the best exchange rate to the lowest. Pick an amount and a payout method (bank account, bKash / wallet, or cash pickup), and each row shows the rate, the fee, and the taka the recipient gets.
+<h1 align="center">Remittance Rate Comparator</h1>
+
+<p align="center">
+  Live GBP → BDT rates from 21 money transfer services, best rate first.
+</p>
+
+<p align="center">
+  <a href="https://github.com/mmarifat/__remittance_rate_comparator/actions/workflows/ci.yml"><img src="https://github.com/mmarifat/__remittance_rate_comparator/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-006a4e" alt="MIT license"></a>
+  <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/contributions-welcome-f5c04a" alt="Contributions welcome"></a>
+</p>
+
+Pick an amount and a payout method (bank account, bKash / wallet, or cash pickup), and see what each service gives for pounds sent to Bangladesh: the rate, the fee, and the taka the recipient gets. GBP → BDT is the only corridor for now.
+
+The logo is a ranked list in miniature: three routes, shortest at the bottom, with the best one in gold and heading out as an arrow.
 
 ## How it works
 

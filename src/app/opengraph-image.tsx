@@ -1,12 +1,14 @@
 import { ImageResponse } from "next/og";
+import { logoDataUri } from "@/lib/logo";
 import { SITE_NAME } from "@/lib/site";
 
 export const alt = `${SITE_NAME}: live GBP to BDT rates, best rate first`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-// Share card in the site's banknote style: flag green, the red disc, and a ranked list teaser.
-export default function Image() {
+// Share card: the logo, the name, and what the list does.
+export default async function Image() {
+  const logo = await logoDataUri();
   const rows = ["Best rate first", "Fees included", "21 services"];
   return new ImageResponse(
     (
@@ -18,13 +20,13 @@ export default function Image() {
           flexDirection: "column",
           justifyContent: "space-between",
           padding: 72,
-          background: "#006a4e",
+          background: "#0b3d2e",
           color: "#eef7f2",
           fontFamily: "sans-serif",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <div style={{ width: 64, height: 64, borderRadius: 999, background: "#f42a41" }} />
+          <img src={logo} width={72} height={72} alt="" style={{ borderRadius: 18, boxShadow: "0 0 0 3px rgba(238,247,242,0.35)" }} />
           <div style={{ fontSize: 34, opacity: 0.85 }}>GBP → BDT · live rates</div>
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>

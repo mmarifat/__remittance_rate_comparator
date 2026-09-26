@@ -5,6 +5,7 @@ import { availableMethods, buildOffers, mostTaka, type Offer } from "@/lib/compa
 import { formatAgo, formatBdt, formatGbp, formatRate } from "@/lib/format";
 import { AUTHOR, REPO_URL } from "@/lib/site";
 import type { DeliveryMethod, RatesSnapshot } from "@/lib/types";
+import Image from "next/image";
 import { Rosette, Waves } from "./Guilloche";
 import { ProviderLogo } from "./ProviderLogo";
 import { useNow } from "./useNow";
@@ -35,7 +36,7 @@ const ROW_GRID =
   "grid grid-cols-[1.75rem_2.25rem_minmax(0,1fr)_auto] items-center gap-x-3 sm:grid-cols-[2rem_2.5rem_minmax(0,1fr)_6.5rem_5rem_8.5rem] sm:gap-x-4";
 
 const CHIP =
-  "inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1 text-sm transition hover:border-flag-green";
+  "inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1 text-sm transition hover:border-brand";
 
 export function RateComparer({ providerCount }: { providerCount: number }) {
   const [snapshot, setSnapshot] = useState<RatesSnapshot | null>(null);
@@ -96,7 +97,7 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
     <div className="mx-auto w-full max-w-4xl px-4 sm:px-8">
       <header className="flex items-center justify-between gap-4 py-5">
         <div className="flex items-center gap-2.5">
-          <FlagMark />
+          <Image src="/logo.svg" alt="" width={30} height={30} unoptimized priority />
           <span className="figure-wide whitespace-nowrap text-sm font-semibold tracking-tight sm:text-lg">
             Remittance <span className="text-muted">Rate Comparator</span>
           </span>
@@ -110,7 +111,7 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
             onClick={refresh}
             disabled={loading}
             title="Check every provider again"
-            className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 font-medium text-ink transition hover:border-flag-green disabled:cursor-not-allowed disabled:opacity-50 sm:px-3.5"
+            className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 font-medium text-ink transition hover:border-brand disabled:cursor-not-allowed disabled:opacity-50 sm:px-3.5"
           >
             <RefreshIcon spinning={loading} />
             {loading ? "Checking…" : "Refresh"}
@@ -150,9 +151,9 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
           Send{" "}
           <label className="inline-flex items-baseline whitespace-nowrap">
             <span className="sr-only">Total you pay, in pounds</span>
-            <span className="text-flag-green">£</span>
+            <span className="text-brand">£</span>
             {/* The invisible copy sizes the field to fit what's typed and keeps it on the headline's baseline. */}
-            <span className="figure relative inline-block border-b-4 border-flag-green text-flag-green">
+            <span className="figure relative inline-block border-b-4 border-brand text-brand">
               <span aria-hidden="true" className="invisible whitespace-pre">
                 {amountText || "0"}
               </span>
@@ -163,7 +164,7 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
                 autoComplete="off"
                 placeholder="0"
                 size={1}
-                className="absolute inset-0 w-full bg-transparent p-0 outline-none placeholder:text-flag-green/40"
+                className="absolute inset-0 w-full bg-transparent p-0 outline-none placeholder:text-brand/40"
               />
             </span>
           </label>{" "}
@@ -178,7 +179,7 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
                 {methods.map((m) => (
                   <label
                     key={m}
-                    className="cursor-pointer whitespace-nowrap rounded-full px-3 py-1.5 text-center text-sm font-medium text-muted transition has-checked:bg-flag-green has-checked:text-paper has-focus-visible:outline-2 has-focus-visible:outline-flag-green sm:px-4"
+                    className="cursor-pointer whitespace-nowrap rounded-full px-3 py-1.5 text-center text-sm font-medium text-muted transition has-checked:bg-brand has-checked:text-paper has-focus-visible:outline-2 has-focus-visible:outline-brand sm:px-4"
                   >
                     <input
                       type="radio"
@@ -307,7 +308,7 @@ export function RateComparer({ providerCount }: { providerCount: number }) {
               href={`${REPO_URL}/blob/main/CONTRIBUTING.md`}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-flag-green"
+              className="font-medium text-ink underline decoration-line underline-offset-4 hover:decoration-brand"
             >
               add a provider or fix one
             </a>
@@ -360,7 +361,7 @@ function OfferRow({ offer, rank, isMostTaka }: { offer: Offer; rank: number; isM
       >
         <span
           className={`figure grid place-items-center rounded-full font-semibold ${
-            top ? "size-8 bg-flag-red text-base text-white" : "size-7 text-sm text-muted"
+            top ? "size-8 bg-gold text-base text-[#0f2a22]" : "size-7 text-sm text-muted"
           }`}
         >
           {rank}
@@ -374,7 +375,7 @@ function OfferRow({ offer, rank, isMostTaka }: { offer: Offer; rank: number; isM
             <span className={`font-semibold ${top ? "text-lg" : ""}`}>{provider.name}</span>
             {isMostTaka && (
               <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${top ? "bg-note-ink/15" : "bg-green-soft text-flag-green"}`}
+                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${top ? "bg-note-ink/15" : "bg-green-soft text-brand"}`}
               >
                 Most taka after fees
               </span>
@@ -409,7 +410,7 @@ function CurrencySelect({ label, options }: { label: string; options: { code: st
       <span className="sr-only">{label}</span>
       <select
         defaultValue={options[0].code}
-        className="figure-wide cursor-pointer appearance-none rounded-full border border-line bg-card py-1.5 pl-3.5 pr-8 text-sm font-semibold text-ink transition hover:border-flag-green"
+        className="figure-wide cursor-pointer appearance-none rounded-full border border-line bg-card py-1.5 pl-3.5 pr-8 text-sm font-semibold text-ink transition hover:border-brand"
       >
         {options.map((c) => (
           <option key={c.code} value={c.code}>
@@ -487,15 +488,6 @@ function LinkedInIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28ZM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12ZM7.12 20.45H3.56V9h3.56v11.45ZM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0Z" />
-    </svg>
-  );
-}
-
-function FlagMark() {
-  return (
-    <svg width="30" height="20" viewBox="0 0 30 20" aria-hidden="true" className="shrink-0">
-      <rect width="30" height="20" rx="4" fill="#006a4e" />
-      <circle cx="13.5" cy="10" r="5.5" fill="#f42a41" />
     </svg>
   );
 }
