@@ -23,7 +23,8 @@ The logo is a ranked list in miniature: three routes, shortest at the bottom, wi
 
 - `src/lib/providers/` has one file per service. Each one calls that service's public price calculator (the same request its website makes) and returns quotes as `{ sendAmount, rate, fee, method }`.
 - `src/lib/snapshot.ts` queries every provider in parallel, caps each one at 20s, drops rates that are more than 10% away from mid-market (a sign the response format changed), and records failures without breaking the rest.
-- `/api/rates` serves that check with a 2-minute cache: Vercel's CDN shares one response across visitors, and each server instance keeps its latest result in memory, so providers are asked at most about once every 2 minutes however busy the site gets. The page calls it on load and when you press Refresh, and a yellow banner suggests refreshing once the rates on screen are 10 minutes old.
+- `/api/rates?stream=1` sends each provider as newline-delimited JSON the moment it answers, so the list fills in progressively instead of waiting for the slowest service. `/api/rates` without `stream` returns the whole snapshot as JSON.
+- Both serve the check with a 2-minute cache: Vercel's CDN shares one response across visitors, and each server instance keeps its latest result in memory, so providers are asked at most about once every 2 minutes however busy the site gets. The page calls it on load and when you press Refresh, and a yellow banner suggests refreshing once the rates on screen are 10 minutes old.
 - Amounts are compared for the same total spend: the fee comes out of what you pay, and the rest is converted.
 - The amount and payout method are kept in the address (`?amount=500&method=wallet`), so a comparison can be shared as a link.
 

@@ -25,6 +25,13 @@ export interface ProviderResult {
   error?: string;
 }
 
+/** One line of the /api/rates?stream=1 response (newline-delimited JSON). */
+export type RatesEvent =
+  | { type: "start"; updatedAt: string; total: number }
+  | { type: "midMarket"; midMarket: number | null }
+  | { type: "provider"; provider: ProviderResult }
+  | { type: "done" };
+
 export interface RatesSnapshot {
   /** ISO timestamp of when the providers were queried. */
   updatedAt: string;

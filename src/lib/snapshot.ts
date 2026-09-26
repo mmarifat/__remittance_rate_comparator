@@ -54,8 +54,34 @@ export async function runProvider(def: ProviderDef, midMarket: number | null): P
   }
 }
 
-export async function fetchSnapshot(): Promise<RatesSnapshot> {
-  const midMarket = await fetchMidMarket();
-  const results = await Promise.all(providers.map((p) => runProvider(p, midMarket)));
-  return { updatedAt: new Date().toISOString(), midMarket, providers: results };
+/** A check of every provider that has started; each result can be used as soon as it settles. */
+export interface Check {
+  /** When the check started (ISO). */
+  updatedAt: string;
+  midMarket: Promise<number | null>;
+  /** One per provider, in registry order. Never rejects: failures resolve with status "error". */
+  results: Promise<ProviderResult>[];
+}
+
+export function startCheck(): Check {
+  const midMarket = fetchMidMarket();
+  return {
+    updatedAt: new Date().toISOString(),
+    midMarket,
+    // Providers need the mid-market rate for the plausibility check; it's the fastest request.
+    results: providers.map((p) => midMarket.then((mid) => runProvider(p, mid))),
+  };
+}
+
+/** Waits for a check to finish and returns it as one snapshot. */
+export async function toSnapshot(check: Check): Promise<RatesSnapshot> {
+  return {
+    updatedAt: check.updatedAt,
+    midMarket: await check.midMarket,
+    providers: await Promise.all(check.results),
+  };
+}
+
+export function fetchSnapshot(): Promise<RatesSnapshot> {
+  return toSnapshot(startCheck());
 }

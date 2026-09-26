@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { availableMethods, buildOffers, mostTaka, type Offer } from "@/lib/compare";
 import {
   appendRecord,
@@ -13,11 +13,12 @@ import {
 } from "@/lib/history";
 import { formatAgo, formatBdt, formatGbp, formatRate } from "@/lib/format";
 import { AUTHOR, REPO_URL, SITE_NAME } from "@/lib/site";
-import type { DeliveryMethod, RatesSnapshot } from "@/lib/types";
+import type { DeliveryMethod, ProviderResult, RatesEvent, RatesSnapshot } from "@/lib/types";
 import Image from "next/image";
 import { Rosette, Waves } from "./Guilloche";
 import { ProviderLogo } from "./ProviderLogo";
 import { Sparkline } from "./Sparkline";
+import { useFlip } from "./useFlip";
 import { useNow } from "./useNow";
 
 const METHOD_LABEL: Record<DeliveryMethod, string> = {
@@ -63,6 +64,11 @@ export function isValidAmount(text: string): boolean {
 }
 
 // The amount and payout method live in the address, so a comparison can be shared as a link.
+/** Replaces a provider's earlier result, or adds it if it's new. */
+function upsertProvider(list: ProviderResult[], result: ProviderResult): ProviderResult[] {
+  return list.some((p) => p.id === result.id) ? list.map((p) => (p.id === result.id ? result : p)) : [...list, result];
+}
+
 function syncUrl(amount: string, method: DeliveryMethod) {
   const params = new URLSearchParams();
   if (amount !== DEFAULT_AMOUNT) params.set("amount", amount);
@@ -86,6 +92,8 @@ export function RateComparer({
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  /** Providers answered so far in the check that's streaming in, or null when none is running. */
+  const [progress, setProgress] = useState<{ received: number; total: number } | null>(null);
   const now = useNow();
 
   const amount = Number(amountText);
@@ -94,13 +102,17 @@ export function RateComparer({
   const offers = snapshot ? buildOffers(snapshot, amount, activeMethod) : [];
   const mostTakaId = offers.length > 1 ? mostTaka(offers)?.provider.id : undefined;
 
-  // Hourly history plus the rates on screen, so each trend ends at "now".
+  const listRef = useRef<HTMLOListElement>(null);
+  useFlip(listRef, offers.map((o) => o.provider.id).join());
+
+  // Hourly history plus the rates on screen (once the check is complete), so each trend ends at "now".
   const [history, setHistory] = useState<HistoryRecord[]>([]);
-  const records = snapshot ? appendRecord(history, toRecord(snapshot)) : history;
+  const records = snapshot && !loading ? appendRecord(history, toRecord(snapshot)) : history;
   const trends = new Map(
     now === null ? [] : offers.map((o) => [o.provider.id, providerTrend(records, o.provider.id, now)] as const),
   );
-  const showTrends = [...trends.values()].some((t) => t.length > 1);
+  // Wait for half a day of history before showing trends; a line over an hour or two says nothing.
+  const showTrends = [...trends.values()].some((t) => t.length > 1 && t.at(-1)!.t - t[0].t >= 12 * 3_600_000);
   const bestTrend = now === null ? [] : bestRateTrend(records, now);
   const trendDays = bestTrend.length > 1 ? Math.round((bestTrend.at(-1)!.t - bestTrend[0].t) / 86_400_000) : 0;
 
@@ -109,11 +121,11 @@ export function RateComparer({
     snapshot?.providers.filter((p) => p.status === "ok" && !p.quotes.some((q) => q.method === activeMethod)) ?? [];
 
   const ago = snapshot && now !== null ? formatAgo(snapshot.updatedAt, now) : null;
+  // Providers still to arrive that aren't on screen yet (none during a refresh of a full list).
+  const pendingNew = (progress?.total ?? providerCount) - (snapshot?.providers.length ?? 0);
   const isStale =
     !loading && snapshot !== null && now !== null && now - Date.parse(snapshot.updatedAt) > STALE_AFTER_MINUTES * 60_000;
 
-  // Every load asks each provider for a live quote; nothing is cached on the server.
-  // Bumping `requestId` (the Refresh button) runs the effect again.
   useEffect(() => {
     let current = true;
     fetch("/api/history")
@@ -125,24 +137,62 @@ export function RateComparer({
     };
   }, []);
 
+  // Rates stream in one provider at a time, so the list fills in as answers arrive instead of
+  // waiting for the slowest service. Bumping `requestId` (the Refresh button) runs it again;
+  // rows already on screen stay put and update in place.
   const [requestId, setRequestId] = useState(0);
   useEffect(() => {
-    let current = true;
-    fetch("/api/rates", { cache: "no-store" })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<RatesSnapshot>;
-      })
-      .then((data) => {
-        if (!current) return;
-        setSnapshot(data);
-        setLoadFailed(false);
-      })
-      .catch(() => current && setLoadFailed(true))
-      .finally(() => current && setLoading(false));
-    return () => {
-      current = false;
+    const abort = new AbortController();
+    const apply = (event: RatesEvent, startedAt: string) => {
+      switch (event.type) {
+        case "start":
+          setProgress({ received: 0, total: event.total });
+          setSnapshot((s) => s ?? { updatedAt: event.updatedAt, midMarket: null, providers: [] });
+          break;
+        case "midMarket":
+          setSnapshot((s) => s && { ...s, midMarket: event.midMarket });
+          break;
+        case "provider":
+          setSnapshot((s) => s && { ...s, providers: upsertProvider(s.providers, event.provider) });
+          setProgress((p) => p && { ...p, received: p.received + 1 });
+          break;
+        case "done":
+          setSnapshot((s) => s && { ...s, updatedAt: startedAt });
+          break;
+      }
     };
+
+    (async () => {
+      try {
+        const res = await fetch("/api/rates?stream=1", { cache: "no-store", signal: abort.signal });
+        if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+        const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+        let buffer = "";
+        let startedAt = "";
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += value;
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line) continue;
+            const event = JSON.parse(line) as RatesEvent;
+            if (event.type === "start") startedAt = event.updatedAt;
+            apply(event, startedAt);
+          }
+        }
+        setLoadFailed(false);
+      } catch {
+        if (!abort.signal.aborted) setLoadFailed(true);
+      } finally {
+        if (!abort.signal.aborted) {
+          setLoading(false);
+          setProgress(null);
+        }
+      }
+    })();
+    return () => abort.abort();
   }, [requestId]);
 
   function refresh() {
@@ -193,7 +243,11 @@ export function RateComparer({
         </div>
         <div className="flex items-center gap-3 text-sm text-muted">
           <span aria-live="polite" className="hidden sm:inline">
-            {loading ? "Checking every service…" : ago && `Updated ${ago}`}
+            {loading
+              ? progress
+                ? `Checked ${progress.received} of ${progress.total}…`
+                : "Checking every service…"
+              : ago && `Updated ${ago}`}
           </span>
           <button
             type="button"
@@ -298,7 +352,18 @@ export function RateComparer({
       </section>
 
       <section aria-labelledby="list-heading" className="pb-10">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-line pb-3">
+        <div className="relative flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-line pb-3">
+          {progress && (
+            <div
+              role="progressbar"
+              aria-label="Services checked"
+              aria-valuemin={0}
+              aria-valuemax={progress.total}
+              aria-valuenow={progress.received}
+              className="absolute inset-x-0 -bottom-px h-0.5 origin-left bg-brand transition-transform duration-300"
+              style={{ transform: `scaleX(${progress.total ? progress.received / progress.total : 0})` }}
+            />
+          )}
           <h2 id="list-heading" className="font-display text-xl font-semibold">
             Best rate first
           </h2>
@@ -328,7 +393,7 @@ export function RateComparer({
           </div>
         )}
 
-        <ol className="mt-2 flex flex-col gap-1">
+        <ol ref={listRef} className="mt-2 flex flex-col gap-1">
           {offers.map((offer, i) => (
             <OfferRow
               key={offer.provider.id}
@@ -340,9 +405,18 @@ export function RateComparer({
           ))}
         </ol>
 
-        {snapshot === null && loading && <LoadingRows providerCount={providerCount} />}
+        {loading && pendingNew > 0 && (
+          <LoadingRows
+            rows={Math.min(3, pendingNew)}
+            label={
+              snapshot
+                ? `Checking ${pendingNew} more ${pendingNew === 1 ? "service" : "services"}…`
+                : `Getting live quotes from ${providerCount} services…`
+            }
+          />
+        )}
 
-        {offers.length === 0 && !(snapshot === null && loading) && (
+        {offers.length === 0 && !loading && (
           <p className="py-10 text-center text-muted">
             {snapshot === null
               ? "Couldn't load rates. Refresh to try again."
@@ -457,8 +531,8 @@ function OfferRow({
 
   return (
     <li
+      data-flip={provider.id}
       className={`rise relative isolate overflow-hidden ${top ? "rounded-2xl bg-note text-note-ink shadow-[0_18px_40px_-24px_rgb(0_60_40/0.7)]" : "border-b border-line"}`}
-      style={{ animationDelay: `${rank * 35}ms` }}
     >
       {top && (
         <>
@@ -577,12 +651,12 @@ function BestRateSummary({ points, days }: { points: TrendPoint[]; days: number 
   );
 }
 
-function LoadingRows({ providerCount }: { providerCount: number }) {
+function LoadingRows({ rows, label }: { rows: number; label: string }) {
   return (
     <div aria-busy="true">
-      <p className="px-3 pb-2 pt-4 text-sm text-muted">Getting live quotes from {providerCount} services…</p>
+      <p className="px-3 pb-2 pt-4 text-sm text-muted">{label}</p>
       <ul aria-hidden="true" className="flex flex-col gap-1">
-        {Array.from({ length: 6 }, (_, i) => (
+        {Array.from({ length: rows }, (_, i) => (
           <li key={i} className={`${rowGrid(false)} border-b border-line px-3 py-4`}>
             <span className="mx-auto size-2 rounded-full bg-line" />
             <span className="size-9 rounded-xl bg-line motion-safe:animate-pulse" />
