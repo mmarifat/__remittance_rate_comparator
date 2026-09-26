@@ -1,12 +1,16 @@
 {
-  "name": "rate-checker",
+  "name": "remittance-rate-comparator",
   "version": "0.1.0",
   "private": true,
+  "description": "Remittance Rate Comparator: live GBP to BDT money transfer rates from 21 providers, best rate first.",
+  "author": "Md Minhaz Ahamed Rifat <mma.rifat66@gmail.com> (https://github.com/mmarifat)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "check:providers": "bun scripts/check-providers.ts"
   },
   "dependencies": {
     "next": "16.3.6",
@@ -21,7 +25,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.2"
   },
   "packageManager": "bun@1.4.0",
   "ignoreScripts": [

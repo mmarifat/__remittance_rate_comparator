@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Remittance Rate Comparator
 
-## Getting Started
+Live GBP → BDT remittance rates, the only corridor for now. Compares what 21 money transfer services give for pounds sent to Bangladesh, ranked from the best exchange rate to the lowest. Pick an amount and a payout method (bank account, bKash / wallet, or cash pickup), and each row shows the rate, the fee, and the taka the recipient gets.
 
-First, run the development server:
+## How it works
+
+- `src/lib/providers/` has one file per service. Each one calls that service's public price calculator (the same request its website makes) and returns quotes as `{ sendAmount, rate, fee, method }`.
+- `src/lib/snapshot.ts` queries every provider in parallel, caps each one at 20s, drops rates that are more than 10% away from mid-market (a sign the response format changed), and records failures without breaking the rest.
+- `/api/rates` runs that check on every call. Nothing is cached: the page calls it once on load and again whenever you press Refresh, and a yellow banner suggests refreshing once the rates on screen are 10 minutes old.
+- Amounts are compared for the same total spend: the fee comes out of what you pay, and the rest is converted.
+
+Some services are covered through another source when their own calculator is unavailable:
+
+| Service | Source |
+| --- | --- |
+| Remitly, Instarem, Western Union | Own calculator, falling back to Wise's published comparison data |
+| TransferGo | Own calculator, falling back to NALA's rate feed |
+| Skrill | Wise's comparison data only |
+
+## Develop
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun install
+bun run dev              # http://localhost:3000
+bun run test             # vitest
+bun run check:providers  # query every provider once and print the results
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`check:providers` is the quickest way to see which provider has broken after a site change. Don't run it in a tight loop: several providers rate-limit (TransferGo's Cloudflare blocks an IP for an hour after a burst).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy (Vercel)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Push this repo to GitHub.
+2. Import it at [vercel.com/new](https://vercel.com/new). The defaults work, and no environment variables are needed.
 
-## Learn More
+`vercel.json` pins functions to London (`lhr1`) because some providers price by the caller's location.
 
-To learn more about Next.js, take a look at the following resources:
+## Adding a provider
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Create `src/lib/providers/<name>.ts` exporting a `ProviderDef`, add it to the list in `src/lib/providers/index.ts`, and run `bun run check:providers`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Caveats
 
-## Deploy on Vercel
+- These are unofficial uses of public calculators, and any provider can change or block them. A failed provider appears under "Couldn't check just now" with a link to its site.
+- Vercel runs on datacenter IPs, which some bot protection treats more strictly than home connections. MoneyGram (DataDome) is the most likely to be blocked.
+- Every page load sends roughly 50 requests to providers. That's fine for personal use, but under heavy traffic the stricter providers (TransferGo, Remitly, MoneyGram) will start rate-limiting the server. If that happens, cache `/api/rates` for a minute or two.
+- XE's quote response states that automatic extraction of rates is prohibited under its Terms of Use. To drop XE, remove it from `src/lib/providers/index.ts`.
+- First-transfer promotions are shown as notes; the ranking uses regular pricing where the provider exposes it.
+- Not included: ACE Money Transfer (Cloudflare blocks non-browser requests), LemFi (obfuscates its rate), Small World (stopped trading in 2024), BA Exchange (only publishes an indicative rate).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Author
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Made by **Md Minhaz Ahamed Rifat**: [GitHub](https://github.com/mmarifat) · [LinkedIn](https://www.linkedin.com/in/mmarifat6/)
