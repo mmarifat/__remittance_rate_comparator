@@ -5,7 +5,8 @@
 <h1 align="center">Remittance Rate Comparator</h1>
 
 <p align="center">
-  Live GBP → BDT rates from 21 money transfer services, best rate first.
+  Live GBP → BDT rates from 21 money transfer services, best rate first.<br>
+  <a href="https://remittance-rate-comparator.vercel.app"><strong>remittance-rate-comparator.vercel.app</strong></a>
 </p>
 
 <p align="center">
@@ -46,8 +47,7 @@ bun run check:providers  # query every provider once and print the results
 
 ## Deploy (Vercel)
 
-1. Push this repo to GitHub.
-2. Import it at [vercel.com/new](https://vercel.com/new). The defaults work, and no environment variables are needed.
+The live site deploys from `main` automatically. To run your own copy, import the repo at [vercel.com/new](https://vercel.com/new). The defaults work, and no environment variables are needed.
 
 `vercel.json` pins functions to London (`lhr1`) because some providers price by the caller's location.
 
@@ -60,7 +60,7 @@ Every request to a provider carries an `X-Open-Source-Client: Remittance Rate Co
 ## Caveats
 
 - These are unofficial uses of public calculators, and any provider can change or block them. A failed provider appears under "Couldn't check just now" with a link to its site.
-- Vercel runs on datacenter IPs, which some bot protection treats more strictly than home connections. MoneyGram (DataDome) is the most likely to be blocked.
+- Vercel runs on datacenter IPs, which some bot protection treats more strictly than home connections. MoneyGram and Xoom currently block requests from Vercel, and Remitly's own calculator does too (it falls back to Wise's comparison data).
 - Every page load sends roughly 50 requests to providers. That's fine for personal use, but under heavy traffic the stricter providers (TransferGo, Remitly, MoneyGram) will start rate-limiting the server. If that happens, cache `/api/rates` for a minute or two.
 - XE's quote response states that automatic extraction of rates is prohibited under its Terms of Use. To drop XE, remove it from `src/lib/providers/index.ts`.
 - First-transfer promotions are shown as notes; the ranking uses regular pricing where the provider exposes it.

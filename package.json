@@ -4,6 +4,7 @@
   "private": true,
   "description": "Remittance Rate Comparator: live GBP to BDT money transfer rates from 21 providers, best rate first.",
   "author": "Md Minhaz Ahamed Rifat <mma.rifat66@gmail.com> (https://github.com/mmarifat)",
+  "homepage": "https://remittance-rate-comparator.vercel.app",
   "license": "MIT",
   "repository": {
     "type": "git",
