@@ -23,7 +23,7 @@ The logo is a ranked list in miniature: three routes, shortest at the bottom, wi
 
 - `src/lib/providers/` has one file per service. Each one calls that service's public price calculator (the same request its website makes) and returns quotes as `{ sendAmount, rate, fee, method }`.
 - `src/lib/snapshot.ts` queries every provider in parallel, caps each one at 20s, drops rates that are more than 10% away from mid-market (a sign the response format changed), and records failures without breaking the rest.
-- `/api/rates` runs that check on every call. Nothing is cached: the page calls it once on load and again whenever you press Refresh, and a yellow banner suggests refreshing once the rates on screen are 10 minutes old.
+- `/api/rates` serves that check with a 2-minute cache: Vercel's CDN shares one response across visitors, and each server instance keeps its latest result in memory, so providers are asked at most about once every 2 minutes however busy the site gets. The page calls it on load and when you press Refresh, and a yellow banner suggests refreshing once the rates on screen are 10 minutes old.
 - Amounts are compared for the same total spend: the fee comes out of what you pay, and the rest is converted.
 
 Some services are covered through another source when their own calculator is unavailable:
@@ -61,7 +61,6 @@ Every request to a provider carries an `X-Open-Source-Client: Remittance Rate Co
 
 - These are unofficial uses of public calculators, and any provider can change or block them. A failed provider appears under "Couldn't check just now" with a link to its site.
 - Vercel runs on datacenter IPs, which some bot protection treats more strictly than home connections. MoneyGram and Xoom currently block requests from Vercel, and Remitly's own calculator does too (it falls back to Wise's comparison data).
-- Every page load sends roughly 50 requests to providers. That's fine for personal use, but under heavy traffic the stricter providers (TransferGo, Remitly, MoneyGram) will start rate-limiting the server. If that happens, cache `/api/rates` for a minute or two.
 - XE's quote response states that automatic extraction of rates is prohibited under its Terms of Use. To drop XE, remove it from `src/lib/providers/index.ts`.
 - First-transfer promotions are shown as notes; the ranking uses regular pricing where the provider exposes it.
 - Not included: ACE Money Transfer (Cloudflare blocks non-browser requests), LemFi (obfuscates its rate), Small World (stopped trading in 2024), BA Exchange (only publishes an indicative rate).
