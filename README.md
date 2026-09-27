@@ -34,6 +34,7 @@ The logo is a ranked list in miniature: three routes, shortest at the bottom, wi
 - Both serve the check with a 2-minute cache: Vercel's CDN shares one response across visitors, and each server instance keeps its latest result in memory, so providers are asked at most about once every 2 minutes however busy the site gets. The page calls it on load and when you press Refresh, and a yellow banner suggests refreshing once the rates on screen are 10 minutes old.
 - Amounts are compared for the same total spend: the fee comes out of what you pay, and the rest is converted.
 - Providers can attach a first-transfer deal to a quote (a better rate, a lower fee, and how much the better rate covers). With "I'm a new customer" on, the list ranks by those; a deal capped at, say, the first €500 is blended with the regular rate for the rest.
+- Visitors start on their own currency: the page reads Vercel's `x-vercel-ip-country` header, so someone in Italy lands on EUR from Italy, in the US on USD, and so on (other eurozone countries get euro prices from Italy; everywhere else starts on GBP). A shared link's choices always win.
 - The currency, country, amount, payout method and new-customer choice are kept in the address (`?from=EUR&country=ES&amount=500&method=wallet&new=1`), so a comparison can be shared as a link.
 
 ### Rate history and provider health

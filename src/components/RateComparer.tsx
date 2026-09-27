@@ -23,6 +23,7 @@ import {
   type CountryCode,
 } from "@/lib/corridors";
 import { currencySymbol, formatAgo, formatBdt, formatMoney, formatRate } from "@/lib/format";
+import { isValidAmount, linkQuery, type Home, type LinkState } from "@/lib/link";
 import { AUTHOR, REPO_URL, SITE_NAME } from "@/lib/site";
 import type { DeliveryMethod, ProviderResult, RatesEvent, RatesSnapshot } from "@/lib/types";
 import Image from "next/image";
@@ -47,8 +48,6 @@ const METHOD_PAYOUT: Record<DeliveryMethod, string> = {
 // Corridors live in src/lib/corridors.ts; the "You send" list shows the ones with at least one provider.
 const RECEIVE_CURRENCIES = [{ value: "BDT", label: "BDT · Taka" }];
 
-const MAX_AMOUNT = 100_000;
-
 /** After this long, a banner suggests refreshing because providers may have moved their rates. */
 const STALE_AFTER_MINUTES = 10;
 
@@ -65,77 +64,50 @@ function rowGrid(trends: boolean) {
 const CHIP =
   "inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1 text-sm transition hover:border-brand";
 
-export const DEFAULT_AMOUNT = "1000";
-export const DEFAULT_METHOD: DeliveryMethod = "bank";
-
-/** Accepts what the amount field accepts: up to 6 digits, 2 decimals, at most MAX_AMOUNT. */
-export function isValidAmount(text: string): boolean {
-  return /^\d{0,6}(\.\d{0,2})?$/.test(text) && Number(text) <= MAX_AMOUNT;
-}
-
 /** Replaces a provider's earlier result, or adds it if it's new. */
 function upsertProvider(list: ProviderResult[], result: ProviderResult): ProviderResult[] {
   return list.some((p) => p.id === result.id) ? list.map((p) => (p.id === result.id ? result : p)) : [...list, result];
 }
 
-interface LinkState {
-  corridorId: CorridorId;
-  country: CountryCode;
-  amount: string;
-  method: DeliveryMethod;
-  newCustomer: boolean;
-}
-
 // Everything the user picks lives in the address, so a comparison can be shared as a link.
-// Defaults are left out to keep links short.
-function syncUrl({ corridorId, country, amount, method, newCustomer }: LinkState) {
-  const corridor = getCorridor(corridorId)!;
-  const params = new URLSearchParams();
-  if (corridorId !== DEFAULT_CORRIDOR) params.set("from", corridor.from);
-  if (country !== corridor.sendCountry) params.set("country", country);
-  if (amount !== DEFAULT_AMOUNT) params.set("amount", amount);
-  if (method !== DEFAULT_METHOD) params.set("method", method);
-  if (newCustomer) params.set("new", "1");
-  const query = params.toString();
+function syncUrl(state: LinkState, home: Home) {
+  const query = linkQuery(state, home);
   window.history.replaceState(null, "", query ? `?${query}` : window.location.pathname);
 }
 
 export function RateComparer({
   providerCounts,
-  initialCorridor = DEFAULT_CORRIDOR,
-  initialCountry,
-  initialAmount = DEFAULT_AMOUNT,
-  initialMethod = DEFAULT_METHOD,
-  initialNewCustomer = false,
+  initial,
+  home,
 }: {
   /** How many providers serve each corridor and sending country, keyed "EUR-BDT:ES". */
   providerCounts: Record<string, number>;
-  initialCorridor?: CorridorId;
-  initialCountry?: string | null;
-  initialAmount?: string;
-  initialMethod?: DeliveryMethod;
-  initialNewCustomer?: boolean;
+  /** Where to start: the shared link's choices, or the visitor's home. */
+  initial: LinkState;
+  /** The visitor's own currency and country, from their location; links leave these out. */
+  home: Home;
 }) {
   const countFor = (c: Corridor) => providerCounts[`${c.id}:${c.sendCountry}`] ?? 0;
   const sendCurrencies = CORRIDORS.filter((c) => countFor(c) > 0).map((c) => ({
     value: c.from,
     label: `${c.from} · ${c.currencyName}`,
   }));
+  const startsOnServedCorridor = countFor(inCountry(getCorridor(initial.corridorId)!, initial.country)) > 0;
   const [corridorId, setCorridorId] = useState<CorridorId>(
-    countFor(getCorridor(initialCorridor)!) > 0 ? initialCorridor : DEFAULT_CORRIDOR,
+    startsOnServedCorridor ? initial.corridorId : DEFAULT_CORRIDOR,
   );
   const [country, setCountry] = useState<CountryCode>(
-    () => inCountry(getCorridor(corridorId)!, initialCountry).sendCountry,
+    startsOnServedCorridor ? initial.country : getCorridor(DEFAULT_CORRIDOR)!.sendCountry,
   );
   const baseCorridor = getCorridor(corridorId)!;
   const corridor = inCountry(baseCorridor, country);
   // History is only recorded for each corridor's default sending country.
   const isDefaultCountry = corridor.sendCountry === baseCorridor.sendCountry;
   const currency = corridor.from;
-  const [newCustomer, setNewCustomer] = useState(initialNewCustomer);
+  const [newCustomer, setNewCustomer] = useState(initial.newCustomer);
   const [latestSnapshot, setSnapshot] = useState<RatesSnapshot | null>(null);
-  const [amountText, setAmountText] = useState(initialAmount);
-  const [method, setMethodState] = useState<DeliveryMethod>(initialMethod);
+  const [amountText, setAmountText] = useState(initial.amount);
+  const [method, setMethodState] = useState<DeliveryMethod>(initial.method);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -273,12 +245,12 @@ export function RateComparer({
     const cleaned = value.replace(/[^\d.]/g, "");
     if (!isValidAmount(cleaned)) return;
     setAmountText(cleaned);
-    syncUrl({ ...link, amount: cleaned });
+    syncUrl({ ...link, amount: cleaned }, home);
   }
 
   function setMethod(m: DeliveryMethod) {
     setMethodState(m);
-    syncUrl({ ...link, method: m });
+    syncUrl({ ...link, method: m }, home);
   }
 
   function changeCorridor(id: CorridorId) {
@@ -288,7 +260,7 @@ export function RateComparer({
     setCountry(next.sendCountry);
     setLoading(true);
     setProgress(null);
-    syncUrl({ ...link, corridorId: id, country: next.sendCountry });
+    syncUrl({ ...link, corridorId: id, country: next.sendCountry }, home);
   }
 
   function changeCountry(code: CountryCode) {
@@ -296,12 +268,12 @@ export function RateComparer({
     setCountry(code);
     setLoading(true);
     setProgress(null);
-    syncUrl({ ...link, country: code });
+    syncUrl({ ...link, country: code }, home);
   }
 
   function toggleNewCustomer(on: boolean) {
     setNewCustomer(on);
-    syncUrl({ ...link, newCustomer: on });
+    syncUrl({ ...link, newCustomer: on }, home);
   }
 
   async function share() {
