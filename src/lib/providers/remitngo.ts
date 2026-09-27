@@ -1,6 +1,7 @@
 import { getText, num, postForm } from "./http";
 import type { ProviderDef } from "./types";
 import type { DeliveryMethod, Quote } from "../types";
+import { urlsFrom } from "./routes";
 
 interface RateResponse {
   success: boolean;
@@ -17,7 +18,7 @@ const AMOUNT = 1000;
 export const remitngo: ProviderDef = {
   id: "remitngo",
   name: "REMITnGO (BRAC Saajan)",
-  urls: { "GBP-BDT": "https://remitngo.com/" },
+  urlFor: urlsFrom({ "GBP-BDT": { url: "https://remitngo.com/" } }),
   domain: "remitngo.com",
   async fetchQuotes() {
     // The calculator is a WordPress AJAX action guarded by a nonce printed on the home page.

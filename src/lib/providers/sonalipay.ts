@@ -1,5 +1,6 @@
 import { atTiers, getJson, num } from "./http";
 import type { ProviderDef } from "./types";
+import { urlsFrom } from "./routes";
 
 interface SonaliQuote {
   success: boolean;
@@ -17,7 +18,7 @@ interface SonaliQuote {
 export const sonalipay: ProviderDef = {
   id: "sonalipay",
   name: "SonaliPay",
-  urls: { "GBP-BDT": "https://www.sonalipay.co.uk/" },
+  urlFor: urlsFrom({ "GBP-BDT": { url: "https://www.sonalipay.co.uk/" } }),
   domain: "sonalipay.co.uk",
   fetchQuotes: () =>
     atTiers(async (amount) => {

@@ -1,5 +1,5 @@
 import { atTiers, getJson, num } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 
 interface TransferGoQuotes {
@@ -20,7 +20,7 @@ const ROUTES: Routes = {
 export const transfergo: ProviderDef = {
   id: "transfergo",
   name: "TransferGo",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "transfergo.com",
   // TransferGo's Cloudflare rate limit is strict (an hour-long block after a burst), so ask for fewer tiers.
   fetchQuotes: (corridor) => {

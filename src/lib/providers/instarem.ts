@@ -1,5 +1,5 @@
 import { atTiers, getJson, num } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 
 const BASE = "https://www.instarem.com/api/v1/public";
@@ -19,17 +19,16 @@ interface Computed {
   };
 }
 
-const ROUTES: Routes = {
-  "GBP-BDT": { url: "https://www.instarem.com/en-gb/send-money-to-bangladesh/" },
-  "EUR-BDT": { url: "https://www.instarem.com/" },
-  "USD-BDT": { url: "https://www.instarem.com/" },
-  "CAD-BDT": { url: "https://www.instarem.com/" },
-};
+// Instarem has a local Bangladesh page for some countries; the rest share its international one.
+const LOCAL_PAGES = new Set(["GB", "US", "CA", "DE", "FR", "IE"]);
+const url = (country: string) =>
+  `https://www.instarem.com/${LOCAL_PAGES.has(country) ? `en-${country.toLowerCase()}` : "en"}/send-money-to-bangladesh/`;
+const ROUTES: Routes = { "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url } };
 
 export const instarem: ProviderDef = {
   id: "instarem",
   name: "Instarem",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "instarem.com",
   async fetchQuotes(corridor) {
     routeFor(ROUTES, corridor);
@@ -45,16 +44,16 @@ export const instarem: ProviderDef = {
         `${BASE}/transaction/computed-value?${route}&instarem_bank_account_id=${bankId}&source_amount=${amount}`,
       );
       promoRate = Math.max(promoRate, num(data.instarem_fx_rate));
-      // Prefer the regular (returning-customer) price; the headline one is a first-transfer promo.
-      const fee =
-        (data.regular_transaction_fee_amount ?? data.transaction_fee_amount) +
-        data.payment_method_fee_amount +
-        data.payout_method_fee_amount;
+      // The headline price is a first-transfer promo; the regular_* fields are what returning customers pay.
+      const otherFees = data.payment_method_fee_amount + data.payout_method_fee_amount;
+      const regularRate = num(data.regular_instarem_fx_rate ?? data.instarem_fx_rate);
+      const firstRate = num(data.instarem_fx_rate);
       return {
         sendAmount: amount,
-        rate: num(data.regular_instarem_fx_rate ?? data.instarem_fx_rate),
-        fee: num(fee),
+        rate: regularRate,
+        fee: num((data.regular_transaction_fee_amount ?? data.transaction_fee_amount) + otherFees),
         method: "bank",
+        promo: firstRate > regularRate ? { rate: firstRate, fee: num(data.transaction_fee_amount + otherFees) } : undefined,
       };
     });
 

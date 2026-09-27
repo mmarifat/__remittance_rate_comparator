@@ -1,22 +1,31 @@
 import { atTiers, getJson, num } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 
 interface Calculator {
   calculator: { transaction: { conversionRate: string; commissionAmount: number } };
 }
 
-const ROUTES: Routes = {
-  "GBP-BDT": { url: "https://paysend.com/en-gb/send-money/from-the-united-kingdom-to-bangladesh" },
-  "EUR-BDT": { url: "https://paysend.com/" },
-  "USD-BDT": { url: "https://paysend.com/" },
-  "CAD-BDT": { url: "https://paysend.com/" },
+// Paysend's corridor pages use a country slug; an unknown one silently shows a different corridor.
+const SLUGS: Record<string, string> = {
+  GB: "the-united-kingdom",
+  IT: "italy",
+  ES: "spain",
+  FR: "france",
+  DE: "germany",
+  PT: "portugal",
+  IE: "ireland",
+  US: "the-united-states-of-america",
+  CA: "canada",
 };
+const url = (country: string) =>
+  `https://paysend.com/${country === "GB" ? "en-gb" : "en-us"}/send-money/from-${SLUGS[country]}-to-bangladesh`;
+const ROUTES: Routes = { "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url } };
 
 export const paysend: ProviderDef = {
   id: "paysend",
   name: "Paysend",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "paysend.com",
   fetchQuotes: (corridor) => {
     routeFor(ROUTES, corridor);

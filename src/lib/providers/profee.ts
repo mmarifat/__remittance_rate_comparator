@@ -1,5 +1,6 @@
+import { COUNTRIES, type CountryCode } from "../corridors";
 import { atTiers, getJson, num, postJson } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 
 interface Methods {
@@ -10,20 +11,21 @@ interface Calculation {
   body: { currencyRate: { rate: number }; feeSum: { amount: number; type?: string } };
 }
 
-/** Profee wants ISO 3166 numeric country codes and a lowercase corridor slug. It doesn't serve US senders. */
-const ROUTES: Routes<{ slug: string; country: number }> = {
-  "GBP-BDT": { url: "https://www.profee.com/send-money/from-united-kingdom-to-bangladesh", slug: "gb-bd", country: 826 },
-  "EUR-BDT": { url: "https://www.profee.com/", slug: "it-bd", country: 380 },
-  "CAD-BDT": { url: "https://www.profee.com/", slug: "ca-bd", country: 124 },
-};
+// Profee doesn't serve US senders.
+const url = (country: CountryCode) =>
+  `https://www.profee.com/send-money/from-${COUNTRIES[country].name.toLowerCase().replace(/ /g, "-")}-to-bangladesh`;
+const ROUTES: Routes = { "GBP-BDT": { url }, "EUR-BDT": { url }, "CAD-BDT": { url } };
 
 export const profee: ProviderDef = {
   id: "profee",
   name: "Profee",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "profee.com",
   async fetchQuotes(corridor) {
-    const { slug, country } = routeFor(ROUTES, corridor);
+    routeFor(ROUTES, corridor);
+    // Profee wants a lowercase corridor slug and ISO 3166 numeric country codes.
+    const slug = `${corridor.sendCountry.toLowerCase()}-bd`;
+    const country = COUNTRIES[corridor.sendCountry].numeric;
     const methods = await getJson<Methods>(`https://www.profee.com/api/corridors/${slug}/methods`);
     const bank = methods.body.find((m) => m.isAvailable && m.recipient.account === "WBANK");
     if (!bank) throw new Error("No bank payout method");

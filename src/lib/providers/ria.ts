@@ -1,17 +1,13 @@
 import { num, postJson, request } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 import type { DeliveryMethod, Quote } from "../types";
 
 const BASE = "https://public.riamoneytransfer.com";
 const AMOUNT = 1000;
 
-const ROUTES: Routes = {
-  "GBP-BDT": { url: "https://www.riamoneytransfer.com/en-gb/send-money-to-bangladesh/" },
-  "EUR-BDT": { url: "https://www.riamoneytransfer.com/it-it/" },
-  "USD-BDT": { url: "https://www.riamoneytransfer.com/en-us/send-money-to-bangladesh/" },
-  "CAD-BDT": { url: "https://www.riamoneytransfer.com/en-ca/" },
-};
+const url = (country: string) => `https://www.riamoneytransfer.com/en-${country.toLowerCase()}/send-money-to-bangladesh/`;
+const ROUTES: Routes = { "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url } };
 
 const METHODS: [string, DeliveryMethod][] = [
   ["BankDeposit", "bank"],
@@ -26,7 +22,7 @@ interface Calculation {
 export const ria: ProviderDef = {
   id: "ria",
   name: "Ria",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "riamoneytransfer.com",
   async fetchQuotes(corridor) {
     routeFor(ROUTES, corridor);
@@ -57,7 +53,14 @@ export const ria: ProviderDef = {
           { headers: { ...HEADERS, Authorization: `Bearer ${token}` } },
         );
         const c = res.model.transferDetails.calculations;
-        quotes.push({ sendAmount: AMOUNT, rate: num(c.exchangeRate), fee: num(c.transferFee), method });
+        const promo = c.exchangeRatePromo && c.exchangeRatePromo > c.exchangeRate ? num(c.exchangeRatePromo) : undefined;
+        quotes.push({
+          sendAmount: AMOUNT,
+          rate: num(c.exchangeRate),
+          fee: num(c.transferFee),
+          method,
+          promo: promo ? { rate: promo } : undefined,
+        });
         if (method === "bank" && c.exchangeRatePromo) promoRate = num(c.exchangeRatePromo);
       } catch (err) {
         if (method === "bank") throw err;

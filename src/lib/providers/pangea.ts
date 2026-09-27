@@ -1,5 +1,5 @@
 import { atTiers, getJson, getText, num } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 
 interface PangeaCalculation {
@@ -24,7 +24,7 @@ export function parsePangeaFees(html: string): { bank: number; cash: number } {
 export const pangea: ProviderDef = {
   id: "pangea",
   name: "Pangea",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "pangeamoneytransfer.com",
   note: "New customers: first transfer has no fee",
   async fetchQuotes(corridor) {
@@ -35,9 +35,11 @@ export const pangea: ProviderDef = {
         `https://api.gopangea.com/api/v1/marketing/fx-calc/calculate?country=bd&amount=${amount}&inputType=send`,
       );
       const rate = num(res.StandardRate.Rate);
+      // Pangea waives the fee on a first transfer.
+      const promo = { fee: 0 };
       return [
-        { sendAmount: amount, rate, fee: fees.bank, method: "bank" as const },
-        { sendAmount: amount, rate, fee: fees.cash, method: "cash" as const },
+        { sendAmount: amount, rate, fee: fees.bank, method: "bank" as const, promo },
+        { sendAmount: amount, rate, fee: fees.cash, method: "cash" as const, promo },
       ];
     }, [100, 1000]);
   },

@@ -1,10 +1,11 @@
 import { num, postJson } from "./http";
 import type { ProviderDef } from "./types";
+import { urlsFrom } from "./routes";
 
 export const necmoney: ProviderDef = {
   id: "necmoney",
   name: "NEC Money",
-  urls: { "GBP-BDT": "https://www.necmoney.com/" },
+  urlFor: urlsFrom({ "GBP-BDT": { url: "https://www.necmoney.com/" } }),
   domain: "necmoney.com",
   async fetchQuotes() {
     const res = await postJson<{ issueRate: number; fee: number }>("https://www.necmoney.com/api/rate", {

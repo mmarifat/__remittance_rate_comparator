@@ -1,12 +1,12 @@
 import { getText, num } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 import type { DeliveryMethod, Quote } from "../types";
 
 const RATES_PAGE = "https://nationalexc.com/todays-rate/";
 
 // National Exchange Company SRL, an Italian remittance house for Bangladesh (not the UK's NEC Money).
-const ROUTES: Routes = { "EUR-BDT": { url: "https://nationalexc.com/" } };
+const ROUTES: Routes = { "EUR-BDT": { url: "https://nationalexc.com/", countries: ["IT"] } };
 
 const METHODS: [RegExp, DeliveryMethod][] = [
   [/^Bank Deposit/, "bank"],
@@ -37,7 +37,7 @@ export function parseNationalExchangeRates(html: string): Quote[] {
 export const nationalexchange: ProviderDef = {
   id: "nationalexchange",
   name: "National Exchange Co.",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "nationalexc.com",
   note: "Fees aren't published; confirm the total before paying",
   async fetchQuotes(corridor) {

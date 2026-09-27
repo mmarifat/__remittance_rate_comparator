@@ -1,5 +1,5 @@
 import { atTiers, getJson, num } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 
 interface WisePrice {
@@ -19,7 +19,7 @@ const ROUTES: Routes = {
 export const wise: ProviderDef = {
   id: "wise",
   name: "Wise",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "wise.com",
   fetchQuotes: (corridor) => {
     routeFor(ROUTES, corridor);

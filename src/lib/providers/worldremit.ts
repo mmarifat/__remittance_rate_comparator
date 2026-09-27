@@ -1,5 +1,5 @@
 import { atTiers, num, postJson } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 
 const GRAPHQL = "https://api.worldremit.com/graphql";
@@ -46,7 +46,7 @@ const ROUTES: Routes = {
 export const worldremit: ProviderDef = {
   id: "worldremit",
   name: "WorldRemit",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "worldremit.com",
   async fetchQuotes(corridor) {
     routeFor(ROUTES, corridor);

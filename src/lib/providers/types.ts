@@ -1,11 +1,14 @@
-import type { Corridor, CorridorId } from "../corridors";
+import type { Corridor } from "../corridors";
 import type { Quote } from "../types";
 
 export interface ProviderDef {
   id: string;
   name: string;
-  /** Where users start a transfer, per corridor. A provider is only checked for the corridors listed here. */
-  urls: Partial<Record<CorridorId, string>>;
+  /**
+   * Where users start a transfer for this corridor and sending country, or undefined where the
+   * provider doesn't offer it. Providers are only checked where this returns a link.
+   */
+  urlFor: (corridor: Corridor) => string | undefined;
   /** Provider's website domain, used to show its logo. */
   domain: string;
   /** Fixed caveat; a fetcher can also return one that depends on the response (e.g. a live promo). */

@@ -23,6 +23,7 @@ import { wise } from "./wise";
 import { worldremit } from "./worldremit";
 import { xe } from "./xe";
 import { xoom } from "./xoom";
+import { urlsFrom } from "./routes";
 
 export const providers: ProviderDef[] = [
   // Global apps
@@ -58,14 +59,14 @@ export const providers: ProviderDef[] = [
     id: "skrill",
     alias: "skrill",
     name: "Skrill",
-    urls: { "GBP-BDT": "https://www.skrill.com/en/money-transfer/send-money-to-bangladesh/" },
+    urlFor: urlsFrom({ "GBP-BDT": { url: "https://www.skrill.com/en/money-transfer/" } }),
     domain: "skrill.com",
   }),
   viaWiseComparison({
     id: "bmo",
     alias: "bmo",
     name: "BMO",
-    urls: { "CAD-BDT": "https://www.bmo.com/main/personal/bank-accounts/" },
+    urlFor: urlsFrom({ "CAD-BDT": { url: "https://www.bmo.com/en-ca/main/personal/ways-to-bank/global-money-transfer/" } }),
     domain: "bmo.com",
   }),
 ];

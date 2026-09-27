@@ -15,12 +15,12 @@
   <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/contributions-welcome-f5c04a" alt="Contributions welcome"></a>
 </p>
 
-Pick the currency you send, an amount and a payout method (bank account, bKash / wallet, or cash pickup), and see what each service gives: the rate, the fee, and the taka the recipient gets.
+Pick the currency you send (and, for euros, your country), an amount and a payout method (bank account, bKash / wallet, or cash pickup), and see what each service gives: the rate, the fee, and the taka the recipient gets. Switch on "I'm a new customer" to rank by first-transfer deals instead of regular prices.
 
 | You send | Sending from | Services |
 | --- | --- | --- |
 | GBP | United Kingdom | 21, including UK specialists SonaliPay, RizRemit, REMITnGO (BRAC Saajan), NEC Money and RemitChoice |
-| EUR | Italy (euro rates vary by country; Italy has the widest coverage) | 16, including National Exchange Co. |
+| EUR | Italy (default), Spain, France, Germany, Portugal or Ireland | 16 from Italy, including National Exchange Co.; 15 elsewhere |
 | USD | United States | 15, including Pangea and Sonali Exchange |
 | CAD | Canada | 14, including BMO |
 
@@ -33,11 +33,12 @@ The logo is a ranked list in miniature: three routes, shortest at the bottom, wi
 - `/api/rates?corridor=EUR-BDT&stream=1` sends each provider as newline-delimited JSON the moment it answers, so the list fills in progressively instead of waiting for the slowest service. `/api/rates` without `stream` returns the whole snapshot as JSON.
 - Both serve the check with a 2-minute cache: Vercel's CDN shares one response across visitors, and each server instance keeps its latest result in memory, so providers are asked at most about once every 2 minutes however busy the site gets. The page calls it on load and when you press Refresh, and a yellow banner suggests refreshing once the rates on screen are 10 minutes old.
 - Amounts are compared for the same total spend: the fee comes out of what you pay, and the rest is converted.
-- The currency, amount and payout method are kept in the address (`?from=USD&amount=500&method=wallet`), so a comparison can be shared as a link.
+- Providers can attach a first-transfer deal to a quote (a better rate, a lower fee, and how much the better rate covers). With "I'm a new customer" on, the list ranks by those; a deal capped at, say, the first €500 is blended with the regular rate for the rest.
+- The currency, country, amount, payout method and new-customer choice are kept in the address (`?from=EUR&country=ES&amount=500&method=wallet&new=1`), so a comparison can be shared as a link.
 
 ### Rate history and provider health
 
-`.github/workflows/rate-history.yml` runs every hour. It reads the live site's `/api/rates` (so it adds no load on providers), appends each provider's headline rate to one file per corridor in [`history/` on the `data` branch](../../tree/data/history), and keeps 30 days. The page shows the last 7 days as a trend per provider, served through `/api/history`.
+`.github/workflows/rate-history.yml` runs every hour. It reads the live site's `/api/rates` (so it adds no load on providers), appends each provider's headline rate to one file per corridor in [`history/` on the `data` branch](../../tree/data/history), and keeps 30 days. Euro history is recorded for Italy only, so trends appear there. The page shows the last 7 days as a trend per provider, served through `/api/history`.
 
 The same job watches provider health: if a provider fails every check for 6 hours, it opens a GitHub issue labelled `provider-health`, and closes it when the provider answers again.
 

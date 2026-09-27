@@ -28,11 +28,12 @@ import { atTiers, getJson, num } from "./http";
 import { routeFor, urlsOf, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 
-// One entry per corridor this provider serves: the page users start a transfer on, plus any
-// request details that differ by corridor (country codes, route ids, ...).
-const ROUTES: Routes<{ country: string }> = {
-  "GBP-BDT": { url: "https://example.com/gb/bangladesh", country: "GBR" },
-  "USD-BDT": { url: "https://example.com/us/bangladesh", country: "USA" },
+// One entry per corridor this provider serves: the page users start a transfer on (a function when it
+// differs by sending country), plus any request details that differ by corridor. `countries` limits a
+// multi-country corridor (euros) to the countries the provider actually serves.
+const ROUTES: Routes<{ product: string }> = {
+  "GBP-BDT": { url: "https://example.com/gb/bangladesh", product: "uk-bd" },
+  "EUR-BDT": { url: (country) => `https://example.com/${country.toLowerCase()}/bangladesh`, product: "eu-bd", countries: ["IT", "ES"] },
 };
 
 export const example: ProviderDef = {
@@ -41,10 +42,10 @@ export const example: ProviderDef = {
   urls: urlsOf(ROUTES),
   domain: "example.com", // used to show the logo
   fetchQuotes: (corridor) => {
-    const { country } = routeFor(ROUTES, corridor);
+    const { product } = routeFor(ROUTES, corridor);
     return atTiers(async (amount) => {
       const res = await getJson<{ rate: string; fee: string }>(
-        `https://example.com/api/quote?country=${country}&from=${corridor.from}&to=BDT&amount=${amount}`,
+        `https://example.com/api/quote?product=${product}&country=${corridor.sendCountry}&from=${corridor.from}&amount=${amount}`,
       );
       return { sendAmount: amount, rate: num(res.rate), fee: num(res.fee), method: "bank" };
     }, [100, 1000]);
@@ -57,7 +58,8 @@ Then add it to the list in `src/lib/providers/index.ts` and run `bun run check:p
 Things to know:
 
 - `rate` is BDT per unit of the sending currency and `fee` is in the sending currency. `method` is `"bank"`, `"wallet"` (bKash and similar) or `"cash"`.
-- `corridor` gives you `from` (e.g. `"EUR"`), `to` (`"BDT"`) and `sendCountry` (ISO alpha-2, e.g. `"IT"`); see `src/lib/corridors.ts`.
+- `corridor` gives you `from` (e.g. `"EUR"`), `to` (`"BDT"`) and `sendCountry` (ISO alpha-2, e.g. `"ES"` when a euro sender picks Spain). `COUNTRIES` in `src/lib/corridors.ts` has each country's alpha-3 and numeric codes for APIs that want those.
+- If the provider shows a first-transfer deal, attach it as `promo: { rate?, fee?, upTo? }` on the quote (see `remitly.ts`); "I'm a new customer" uses it.
 - If a provider prices each way of paying separately (card, bank transfer, ...), use the cheapest non-crypto one, as `westernunion.ts` does.
 - If a provider publishes its rate but not its fee, set `fee: 0, feeUnknown: true` (see `nationalexchange.ts`). The page then shows the fee as "Not listed".
 - When a rate comes from a web page rather than an API, put the parsing in an exported function and add a test with a trimmed copy of the page to `src/lib/providers.test.ts`.

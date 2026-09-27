@@ -1,5 +1,5 @@
 import { num, postJson, request } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 import type { DeliveryMethod, Quote } from "../types";
 
@@ -23,7 +23,7 @@ const ROUTES: Routes = { "GBP-BDT": { url: URL }, "EUR-BDT": { url: URL }, "USD-
 export const xoom: ProviderDef = {
   id: "xoom",
   name: "Xoom",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "xoom.com",
   async fetchQuotes(corridor) {
     routeFor(ROUTES, corridor);

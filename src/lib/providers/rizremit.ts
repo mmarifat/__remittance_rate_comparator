@@ -1,10 +1,11 @@
 import { getText, num } from "./http";
 import type { ProviderDef } from "./types";
+import { urlsFrom } from "./routes";
 
 export const rizremit: ProviderDef = {
   id: "rizremit",
   name: "RizRemit",
-  urls: { "GBP-BDT": "https://rizremit.com/en-uk/send-money-to-bangladesh" },
+  urlFor: urlsFrom({ "GBP-BDT": { url: "https://rizremit.com/en-uk/send-money-to-bangladesh" } }),
   domain: "rizremit.com",
   async fetchQuotes() {
     // The rate and flat fee are server-rendered into the corridor page.

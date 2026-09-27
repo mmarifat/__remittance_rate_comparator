@@ -1,5 +1,5 @@
 import { atTiers, getJson, num } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 
 interface SendwavePrice {
@@ -8,17 +8,14 @@ interface SendwavePrice {
   campaignsApplied: unknown[];
 }
 
-const ROUTES: Routes = {
-  "GBP-BDT": { url: "https://www.sendwave.com/en-gb/send-money-to-bangladesh" },
-  "EUR-BDT": { url: "https://www.sendwave.com/" },
-  "USD-BDT": { url: "https://www.sendwave.com/" },
-  "CAD-BDT": { url: "https://www.sendwave.com/" },
-};
+// Sendwave has no Bangladesh landing page; its taka page shows the rate and links to the app.
+const url = "https://www.sendwave.com/en/currency-converter/currencies/bdt_bd";
+const ROUTES: Routes = { "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url } };
 
 export const sendwave: ProviderDef = {
   id: "sendwave",
   name: "Sendwave",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "sendwave.com",
   fetchQuotes: (corridor) => {
     routeFor(ROUTES, corridor);

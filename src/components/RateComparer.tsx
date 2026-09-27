@@ -11,7 +11,17 @@ import {
   type HistoryRecord,
   type TrendPoint,
 } from "@/lib/history";
-import { CORRIDORS, DEFAULT_CORRIDOR, corridorFrom, getCorridor, type CorridorId } from "@/lib/corridors";
+import {
+  CORRIDORS,
+  COUNTRIES,
+  DEFAULT_CORRIDOR,
+  corridorFrom,
+  getCorridor,
+  inCountry,
+  type Corridor,
+  type CorridorId,
+  type CountryCode,
+} from "@/lib/corridors";
 import { currencySymbol, formatAgo, formatBdt, formatMoney, formatRate } from "@/lib/format";
 import { AUTHOR, REPO_URL, SITE_NAME } from "@/lib/site";
 import type { DeliveryMethod, ProviderResult, RatesEvent, RatesSnapshot } from "@/lib/types";
@@ -35,7 +45,7 @@ const METHOD_PAYOUT: Record<DeliveryMethod, string> = {
 };
 
 // Corridors live in src/lib/corridors.ts; the "You send" list shows the ones with at least one provider.
-const RECEIVE_CURRENCIES = [{ code: "BDT", name: "Taka" }];
+const RECEIVE_CURRENCIES = [{ value: "BDT", label: "BDT · Taka" }];
 
 const MAX_AMOUNT = 100_000;
 
@@ -63,17 +73,29 @@ export function isValidAmount(text: string): boolean {
   return /^\d{0,6}(\.\d{0,2})?$/.test(text) && Number(text) <= MAX_AMOUNT;
 }
 
-// The amount and payout method live in the address, so a comparison can be shared as a link.
 /** Replaces a provider's earlier result, or adds it if it's new. */
 function upsertProvider(list: ProviderResult[], result: ProviderResult): ProviderResult[] {
   return list.some((p) => p.id === result.id) ? list.map((p) => (p.id === result.id ? result : p)) : [...list, result];
 }
 
-function syncUrl(amount: string, method: DeliveryMethod, corridorId: CorridorId) {
+interface LinkState {
+  corridorId: CorridorId;
+  country: CountryCode;
+  amount: string;
+  method: DeliveryMethod;
+  newCustomer: boolean;
+}
+
+// Everything the user picks lives in the address, so a comparison can be shared as a link.
+// Defaults are left out to keep links short.
+function syncUrl({ corridorId, country, amount, method, newCustomer }: LinkState) {
+  const corridor = getCorridor(corridorId)!;
   const params = new URLSearchParams();
-  if (corridorId !== DEFAULT_CORRIDOR) params.set("from", getCorridor(corridorId)!.from);
+  if (corridorId !== DEFAULT_CORRIDOR) params.set("from", corridor.from);
+  if (country !== corridor.sendCountry) params.set("country", country);
   if (amount !== DEFAULT_AMOUNT) params.set("amount", amount);
   if (method !== DEFAULT_METHOD) params.set("method", method);
+  if (newCustomer) params.set("new", "1");
   const query = params.toString();
   window.history.replaceState(null, "", query ? `?${query}` : window.location.pathname);
 }
@@ -81,24 +103,36 @@ function syncUrl(amount: string, method: DeliveryMethod, corridorId: CorridorId)
 export function RateComparer({
   providerCounts,
   initialCorridor = DEFAULT_CORRIDOR,
+  initialCountry,
   initialAmount = DEFAULT_AMOUNT,
   initialMethod = DEFAULT_METHOD,
+  initialNewCustomer = false,
 }: {
-  /** How many providers serve each corridor, for the loading message. */
+  /** How many providers serve each corridor and sending country, keyed "EUR-BDT:ES". */
   providerCounts: Record<string, number>;
   initialCorridor?: CorridorId;
+  initialCountry?: string | null;
   initialAmount?: string;
   initialMethod?: DeliveryMethod;
+  initialNewCustomer?: boolean;
 }) {
-  const sendCurrencies = CORRIDORS.filter((c) => (providerCounts[c.id] ?? 0) > 0).map((c) => ({
-    code: c.from,
-    name: c.currencyName,
+  const countFor = (c: Corridor) => providerCounts[`${c.id}:${c.sendCountry}`] ?? 0;
+  const sendCurrencies = CORRIDORS.filter((c) => countFor(c) > 0).map((c) => ({
+    value: c.from,
+    label: `${c.from} · ${c.currencyName}`,
   }));
   const [corridorId, setCorridorId] = useState<CorridorId>(
-    (providerCounts[initialCorridor] ?? 0) > 0 ? initialCorridor : DEFAULT_CORRIDOR,
+    countFor(getCorridor(initialCorridor)!) > 0 ? initialCorridor : DEFAULT_CORRIDOR,
   );
-  const corridor = getCorridor(corridorId)!;
+  const [country, setCountry] = useState<CountryCode>(
+    () => inCountry(getCorridor(corridorId)!, initialCountry).sendCountry,
+  );
+  const baseCorridor = getCorridor(corridorId)!;
+  const corridor = inCountry(baseCorridor, country);
+  // History is only recorded for each corridor's default sending country.
+  const isDefaultCountry = corridor.sendCountry === baseCorridor.sendCountry;
   const currency = corridor.from;
+  const [newCustomer, setNewCustomer] = useState(initialNewCustomer);
   const [latestSnapshot, setSnapshot] = useState<RatesSnapshot | null>(null);
   const [amountText, setAmountText] = useState(initialAmount);
   const [method, setMethodState] = useState<DeliveryMethod>(initialMethod);
@@ -109,12 +143,16 @@ export function RateComparer({
   const [progress, setProgress] = useState<{ received: number; total: number } | null>(null);
   const now = useNow();
 
-  // Rates for another corridor (just switched away from) are never shown.
-  const snapshot = latestSnapshot?.corridor === corridorId ? latestSnapshot : null;
+  // Rates for another corridor or country (just switched away from) are never shown.
+  const snapshot =
+    latestSnapshot?.corridor === corridorId && latestSnapshot.sendCountry === corridor.sendCountry
+      ? latestSnapshot
+      : null;
   const amount = Number(amountText);
   const methods: DeliveryMethod[] = snapshot ? availableMethods(snapshot.providers) : ["bank", "wallet", "cash"];
   const activeMethod = methods.includes(method) ? method : (methods[0] ?? "bank");
-  const offers = snapshot ? buildOffers(snapshot, amount, activeMethod) : [];
+  const offers = snapshot ? buildOffers(snapshot, amount, activeMethod, { newCustomer }) : [];
+  const hasDeals = snapshot?.providers.some((p) => p.quotes.some((q) => q.promo)) ?? false;
   const mostTakaId = offers.length > 1 ? mostTaka(offers)?.provider.id : undefined;
 
   const listRef = useRef<HTMLOListElement>(null);
@@ -122,7 +160,7 @@ export function RateComparer({
 
   // Hourly history plus the rates on screen (once the check is complete), so each trend ends at "now".
   const [historyByCorridor, setHistoryByCorridor] = useState<Record<string, HistoryRecord[]>>({});
-  const history = historyByCorridor[corridorId] ?? [];
+  const history = isDefaultCountry ? (historyByCorridor[corridorId] ?? []) : [];
   const records = snapshot && !loading ? appendRecord(history, toRecord(snapshot)) : history;
   const trends = new Map(
     now === null ? [] : offers.map((o) => [o.provider.id, providerTrend(records, o.provider.id, now)] as const),
@@ -138,7 +176,7 @@ export function RateComparer({
 
   const ago = snapshot && now !== null ? formatAgo(snapshot.updatedAt, now) : null;
   // Providers still to arrive that aren't on screen yet (none during a refresh of a full list).
-  const pendingNew = (progress?.total ?? providerCounts[corridorId] ?? 0) - (snapshot?.providers.length ?? 0);
+  const pendingNew = (progress?.total ?? countFor(corridor)) - (snapshot?.providers.length ?? 0);
   const isStale =
     !loading && snapshot !== null && now !== null && now - Date.parse(snapshot.updatedAt) > STALE_AFTER_MINUTES * 60_000;
 
@@ -164,9 +202,15 @@ export function RateComparer({
         case "start":
           setProgress({ received: 0, total: event.total });
           setSnapshot((s) =>
-            s?.corridor === event.corridor
+            s?.corridor === event.corridor && s.sendCountry === event.sendCountry
               ? s
-              : { corridor: event.corridor, updatedAt: event.updatedAt, midMarket: null, providers: [] },
+              : {
+                  corridor: event.corridor,
+                  sendCountry: event.sendCountry,
+                  updatedAt: event.updatedAt,
+                  midMarket: null,
+                  providers: [],
+                },
           );
           break;
         case "midMarket":
@@ -184,7 +228,7 @@ export function RateComparer({
 
     (async () => {
       try {
-        const res = await fetch(`/api/rates?corridor=${corridorId}&stream=1`, {
+        const res = await fetch(`/api/rates?corridor=${corridorId}&country=${country}&stream=1`, {
           cache: "no-store",
           signal: abort.signal,
         });
@@ -216,38 +260,55 @@ export function RateComparer({
       }
     })();
     return () => abort.abort();
-  }, [requestId, corridorId]);
+  }, [requestId, corridorId, country]);
 
   function refresh() {
     setLoading(true);
     setRequestId((n) => n + 1);
   }
 
+  const link: LinkState = { corridorId, country, amount: amountText, method: activeMethod, newCustomer };
+
   function onAmountChange(value: string) {
     const cleaned = value.replace(/[^\d.]/g, "");
     if (!isValidAmount(cleaned)) return;
     setAmountText(cleaned);
-    syncUrl(cleaned, activeMethod, corridorId);
+    syncUrl({ ...link, amount: cleaned });
   }
 
   function setMethod(m: DeliveryMethod) {
     setMethodState(m);
-    syncUrl(amountText, m, corridorId);
+    syncUrl({ ...link, method: m });
   }
 
   function changeCorridor(id: CorridorId) {
     if (id === corridorId) return;
+    const next = getCorridor(id)!;
     setCorridorId(id);
+    setCountry(next.sendCountry);
     setLoading(true);
     setProgress(null);
-    syncUrl(amountText, activeMethod, id);
+    syncUrl({ ...link, corridorId: id, country: next.sendCountry });
+  }
+
+  function changeCountry(code: CountryCode) {
+    if (code === country) return;
+    setCountry(code);
+    setLoading(true);
+    setProgress(null);
+    syncUrl({ ...link, country: code });
+  }
+
+  function toggleNewCustomer(on: boolean) {
+    setNewCustomer(on);
+    syncUrl({ ...link, newCustomer: on });
   }
 
   async function share() {
     const url = window.location.href;
     const best = offers[0];
     const text = best
-      ? `Sending ${formatMoney(amount, currency)} to Bangladesh? ${best.provider.name} has the best rate right now: ${formatRate(best.quote.rate)}.`
+      ? `Sending ${formatMoney(amount, currency)} to Bangladesh? ${best.provider.name} has the best rate right now: ${formatRate(best.rate)}.`
       : `Compare ${currency} to BDT money transfer rates.`;
     // Phones get the native share sheet (WhatsApp etc.); desktops copy the link.
     if (navigator.share && window.matchMedia("(pointer: coarse)").matches) {
@@ -315,7 +376,7 @@ export function RateComparer({
 
       <section className="rise pb-6 pt-6 sm:pt-10">
         <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2">
-          <CurrencySelect
+          <Select
             label="You send"
             options={sendCurrencies}
             value={currency}
@@ -324,9 +385,17 @@ export function RateComparer({
           <span aria-hidden="true" className="text-muted">
             →
           </span>
-          <CurrencySelect label="They receive" options={RECEIVE_CURRENCIES} value="BDT" />
-          {corridor.from === "EUR" && (
-            <span className="text-sm text-muted">Euro rates are for sending from {corridor.countryName}</span>
+          <Select label="They receive" options={RECEIVE_CURRENCIES} value="BDT" />
+          {corridor.sendCountries.length > 1 && (
+            <span className="inline-flex items-center gap-2 text-sm text-muted">
+              from
+              <Select
+                label="Sending from"
+                options={corridor.sendCountries.map((c) => ({ value: c, label: COUNTRIES[c].name }))}
+                value={corridor.sendCountry}
+                onChange={(code) => changeCountry(code as CountryCode)}
+              />
+            </span>
           )}
         </div>
         <h1 className="font-display text-[clamp(2.1rem,6vw,3.4rem)] font-semibold leading-[1.02] tracking-tight">
@@ -376,6 +445,22 @@ export function RateComparer({
                 ))}
               </div>
             </fieldset>
+          )}
+          {hasDeals && (
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                role="switch"
+                checked={newCustomer}
+                onChange={(e) => toggleNewCustomer(e.target.checked)}
+                className="peer sr-only"
+              />
+              <span
+                aria-hidden="true"
+                className="relative h-5 w-9 rounded-full bg-line transition peer-checked:bg-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-4"
+              />
+              I&apos;m a new customer
+            </label>
           )}
           {snapshot?.midMarket && (
             <p className="text-sm text-muted">
@@ -569,7 +654,7 @@ function OfferRow({
 }) {
   const { provider, quote } = offer;
   const top = rank === 1;
-  const fee = quote.feeUnknown ? "Fee not listed" : quote.fee ? `${formatMoney(quote.fee, currency)} fee` : "No fee";
+  const fee = quote.feeUnknown ? "Fee not listed" : offer.fee ? `${formatMoney(offer.fee, currency)} fee` : "No fee";
 
   return (
     <li
@@ -609,6 +694,13 @@ function OfferRow({
                 Most taka after fees
               </span>
             )}
+            {offer.promo && (
+              <span
+                className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${top ? "bg-gold/25" : "bg-gold/20 text-ink"}`}
+              >
+                New-customer price
+              </span>
+            )}
           </span>
           <span className={`line-clamp-2 text-sm ${top ? "opacity-80" : "text-muted"}`}>
             <span className="sm:hidden">
@@ -626,10 +718,10 @@ function OfferRow({
         )}
 
         <span className={`figure text-right font-semibold ${top ? "text-3xl sm:text-4xl" : "text-2xl"}`}>
-          {formatRate(quote.rate)}
+          {formatRate(offer.rate)}
         </span>
         <span className={`hidden text-right text-sm sm:block ${top ? "" : "text-muted"}`}>
-          {quote.feeUnknown ? "Not listed" : quote.fee ? formatMoney(quote.fee, currency) : "None"}
+          {quote.feeUnknown ? "Not listed" : offer.fee ? formatMoney(offer.fee, currency) : "None"}
         </span>
         <span className={`figure hidden text-right text-xl sm:block ${top ? "font-semibold" : ""}`}>
           {formatBdt(offer.receive)}
@@ -639,16 +731,16 @@ function OfferRow({
   );
 }
 
-function CurrencySelect({
+function Select({
   label,
   options,
   value,
   onChange,
 }: {
   label: string;
-  options: { code: string; name: string }[];
+  options: { value: string; label: string }[];
   value: string;
-  onChange?: (code: string) => void;
+  onChange?: (value: string) => void;
 }) {
   return (
     <label className="relative inline-flex items-center">
@@ -659,9 +751,9 @@ function CurrencySelect({
         disabled={options.length < 2}
         className="figure-wide cursor-pointer appearance-none rounded-full border border-line bg-card py-1.5 pl-3.5 pr-8 text-sm font-semibold text-ink transition hover:border-brand"
       >
-        {options.map((c) => (
-          <option key={c.code} value={c.code}>
-            {c.code} · {c.name}
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
           </option>
         ))}
       </select>

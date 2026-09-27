@@ -1,5 +1,5 @@
 import { atTiers, num, postJson } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 import type { DeliveryMethod, Quote } from "../types";
 
@@ -17,7 +17,7 @@ const ROUTES: Routes = { "GBP-BDT": { url: URL }, "EUR-BDT": { url: URL }, "USD-
 export const xe: ProviderDef = {
   id: "xe",
   name: "XE",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "xe.com",
   fetchQuotes: (corridor) => {
     routeFor(ROUTES, corridor);

@@ -1,6 +1,6 @@
 import type { Corridor } from "../corridors";
 import { getJson, num } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 
 interface FeedRow {
@@ -28,7 +28,7 @@ const ROUTES: Routes = { "GBP-BDT": { url: URL }, "EUR-BDT": { url: URL }, "USD-
 export const nala: ProviderDef = {
   id: "nala",
   name: "NALA",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "nala.com",
   async fetchQuotes(corridor) {
     routeFor(ROUTES, corridor);

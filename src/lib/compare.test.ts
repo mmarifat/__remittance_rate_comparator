@@ -20,6 +20,7 @@ const provider = (id: string, quotes: Quote[], status: ProviderResult["status"] 
 
 const snapshot = (providers: ProviderResult[]): RatesSnapshot => ({
   corridor: "GBP-BDT",
+  sendCountry: "GB",
   updatedAt: "2026-09-26T10:00:00Z",
   midMarket: 163,
   providers,
@@ -71,6 +72,37 @@ describe("buildOffers", () => {
     );
     expect(offers[0].provider.id).toBe("fee-unknown");
     expect(mostTaka(offers)?.provider.id).toBe("known");
+  });
+
+  it("ignores new-customer deals unless asked", () => {
+    const snap = snapshot([provider("deal", [{ ...q(1000, 160, 2), promo: { rate: 165, fee: 0 } }])]);
+    expect(buildOffers(snap, 1000, "bank")[0]).toMatchObject({ rate: 160, fee: 2, promo: false, receive: 159680 });
+    expect(buildOffers(snap, 1000, "bank", { newCustomer: true })[0]).toMatchObject({
+      rate: 165,
+      fee: 0,
+      promo: true,
+      receive: 165000,
+    });
+  });
+
+  it("blends a capped deal rate with the regular rate above the cap", () => {
+    const snap = snapshot([provider("capped", [{ ...q(1000, 160, 0), promo: { rate: 170, upTo: 100 } }])]);
+    const [offer] = buildOffers(snap, 1000, "bank", { newCustomer: true });
+    // 100 at 170 + 900 at 160
+    expect(offer.receive).toBe(161000);
+    expect(offer.rate).toBe(161);
+  });
+
+  it("re-ranks by the new-customer price", () => {
+    const snap = snapshot([
+      provider("regular-best", [q(1000, 162, 0)]),
+      provider("deal", [{ ...q(1000, 160, 0), promo: { rate: 164 } }]),
+    ]);
+    expect(buildOffers(snap, 1000, "bank").map((o) => o.provider.id)).toEqual(["regular-best", "deal"]);
+    expect(buildOffers(snap, 1000, "bank", { newCustomer: true }).map((o) => o.provider.id)).toEqual([
+      "deal",
+      "regular-best",
+    ]);
   });
 
   it("breaks rate ties by taka received", () => {

@@ -1,5 +1,5 @@
 import { getJson, num } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 
 interface FeedCorridor {
@@ -24,7 +24,7 @@ const ROUTES: Routes = {
 export const taptapsend: ProviderDef = {
   id: "taptapsend",
   name: "Taptap Send",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "taptapsend.com",
   async fetchQuotes(corridor) {
     routeFor(ROUTES, corridor);

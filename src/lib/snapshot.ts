@@ -43,11 +43,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 export function supports(def: ProviderDef, corridor: Corridor): boolean {
-  return Boolean(def.urls[corridor.id as keyof ProviderDef["urls"]]);
+  return Boolean(def.urlFor(corridor));
 }
 
 export async function runProvider(def: ProviderDef, corridor: Corridor, midMarket: number | null): Promise<ProviderResult> {
-  const url = def.urls[corridor.id as keyof ProviderDef["urls"]] ?? "";
+  const url = def.urlFor(corridor) ?? "";
   const base = { id: def.id, name: def.name, url, domain: def.domain };
   try {
     const fetched = await withTimeout(def.fetchQuotes(corridor), PROVIDER_TIMEOUT_MS);
@@ -93,6 +93,7 @@ export function startCheck(corridor: Corridor): Check {
 export async function toSnapshot(check: Check): Promise<RatesSnapshot> {
   return {
     corridor: check.corridor.id,
+    sendCountry: check.corridor.sendCountry,
     updatedAt: check.updatedAt,
     midMarket: await check.midMarket,
     providers: await Promise.all(check.results),

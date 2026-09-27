@@ -1,5 +1,5 @@
 import { atTiers, num, postJson } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 import type { DeliveryMethod } from "../types";
 
@@ -10,17 +10,13 @@ interface Catalog {
 
 const SERVICES: Record<string, DeliveryMethod> = { "500": "bank", "800": "wallet", "000": "cash" };
 
-const ROUTES: Routes = {
-  "GBP-BDT": { url: "https://www.westernunion.com/gb/en/send-money-to-bangladesh.html" },
-  "EUR-BDT": { url: "https://www.westernunion.com/it/en/send-money-to-bangladesh.html" },
-  "USD-BDT": { url: "https://www.westernunion.com/us/en/send-money-to-bangladesh.html" },
-  "CAD-BDT": { url: "https://www.westernunion.com/ca/en/send-money-to-bangladesh.html" },
-};
+const url = (country: string) => `https://www.westernunion.com/${country.toLowerCase()}/en/send-money-to-bangladesh.html`;
+const ROUTES: Routes = { "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url } };
 
 export const westernunion: ProviderDef = {
   id: "western-union",
   name: "Western Union",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "westernunion.com",
   fetchQuotes: (corridor) => {
     routeFor(ROUTES, corridor);

@@ -1,6 +1,7 @@
 import { num, request } from "./http";
 import type { ProviderDef } from "./types";
 import type { DeliveryMethod, Quote } from "../types";
+import { urlsFrom } from "./routes";
 
 const METHODS: [string, DeliveryMethod][] = [
   ["Bank", "bank"],
@@ -12,7 +13,7 @@ const AMOUNT = 1000;
 export const remitchoice: ProviderDef = {
   id: "remitchoice",
   name: "RemitChoice",
-  urls: { "GBP-BDT": "https://www.remitchoice.com/fee-free-send-money-to/bangladesh" },
+  urlFor: urlsFrom({ "GBP-BDT": { url: "https://www.remitchoice.com/fee-free-send-money-to/bangladesh" } }),
   domain: "remitchoice.com",
   async fetchQuotes() {
     const quotes: Quote[] = [];

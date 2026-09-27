@@ -1,5 +1,5 @@
 import { getText, num } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 import type { Quote } from "../types";
 
@@ -33,7 +33,7 @@ export function parseSonaliRates(html: string): Quote[] {
 export const sonaliexchange: ProviderDef = {
   id: "sonaliexchange",
   name: "Sonali Exchange",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "sonaliexchange.com",
   async fetchQuotes(corridor) {
     routeFor(ROUTES, corridor);
