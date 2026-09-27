@@ -1,7 +1,9 @@
 import { instarem } from "./instarem";
 import { moneygram } from "./moneygram";
 import { nala, withNalaFallback } from "./nala";
+import { nationalexchange } from "./nationalexchange";
 import { necmoney } from "./necmoney";
+import { pangea } from "./pangea";
 import { paysend } from "./paysend";
 import { profee } from "./profee";
 import { remitchoice } from "./remitchoice";
@@ -10,6 +12,7 @@ import { remitngo } from "./remitngo";
 import { ria } from "./ria";
 import { rizremit } from "./rizremit";
 import { sendwave } from "./sendwave";
+import { sonaliexchange } from "./sonaliexchange";
 import { sonalipay } from "./sonalipay";
 import { taptapsend } from "./taptapsend";
 import { transfergo } from "./transfergo";
@@ -45,6 +48,11 @@ export const providers: ProviderDef[] = [
   remitngo,
   necmoney,
   remitchoice,
+  // US specialists
+  pangea,
+  sonaliexchange,
+  // Italy specialists
+  nationalexchange,
   // Only available through Wise's comparison data
   viaWiseComparison({
     id: "skrill",
@@ -52,5 +60,12 @@ export const providers: ProviderDef[] = [
     name: "Skrill",
     urls: { "GBP-BDT": "https://www.skrill.com/en/money-transfer/send-money-to-bangladesh/" },
     domain: "skrill.com",
+  }),
+  viaWiseComparison({
+    id: "bmo",
+    alias: "bmo",
+    name: "BMO",
+    urls: { "CAD-BDT": "https://www.bmo.com/main/personal/bank-accounts/" },
+    domain: "bmo.com",
   }),
 ];

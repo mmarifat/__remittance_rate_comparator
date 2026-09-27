@@ -569,7 +569,7 @@ function OfferRow({
 }) {
   const { provider, quote } = offer;
   const top = rank === 1;
-  const fee = quote.fee ? `${formatMoney(quote.fee, currency)} fee` : "No fee";
+  const fee = quote.feeUnknown ? "Fee not listed" : quote.fee ? `${formatMoney(quote.fee, currency)} fee` : "No fee";
 
   return (
     <li
@@ -629,7 +629,7 @@ function OfferRow({
           {formatRate(quote.rate)}
         </span>
         <span className={`hidden text-right text-sm sm:block ${top ? "" : "text-muted"}`}>
-          {quote.fee ? formatMoney(quote.fee, currency) : "None"}
+          {quote.feeUnknown ? "Not listed" : quote.fee ? formatMoney(quote.fee, currency) : "None"}
         </span>
         <span className={`figure hidden text-right text-xl sm:block ${top ? "font-semibold" : ""}`}>
           {formatBdt(offer.receive)}

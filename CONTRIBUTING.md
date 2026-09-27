@@ -59,6 +59,8 @@ Things to know:
 - `rate` is BDT per unit of the sending currency and `fee` is in the sending currency. `method` is `"bank"`, `"wallet"` (bKash and similar) or `"cash"`.
 - `corridor` gives you `from` (e.g. `"EUR"`), `to` (`"BDT"`) and `sendCountry` (ISO alpha-2, e.g. `"IT"`); see `src/lib/corridors.ts`.
 - If a provider prices each way of paying separately (card, bank transfer, ...), use the cheapest non-crypto one, as `westernunion.ts` does.
+- If a provider publishes its rate but not its fee, set `fee: 0, feeUnknown: true` (see `nationalexchange.ts`). The page then shows the fee as "Not listed".
+- When a rate comes from a web page rather than an API, put the parsing in an exported function and add a test with a trimmed copy of the page to `src/lib/providers.test.ts`.
 - Use regular pricing, not first-transfer promotions. Put a promotion in `note` instead (see `remitly.ts`).
 - If the price depends on the amount, quote a few amounts with `atTiers`. If it doesn't, return one quote.
 - Always use the helpers in `http.ts` (`getJson`, `postJson`, `postForm`, `getText`, `request`), never bare `fetch`. They add the `X-Open-Source-Client` header that tells providers who is asking, plus a timeout and a retry on HTTP 429.

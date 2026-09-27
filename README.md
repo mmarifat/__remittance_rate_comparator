@@ -19,10 +19,10 @@ Pick the currency you send, an amount and a payout method (bank account, bKash /
 
 | You send | Sending from | Services |
 | --- | --- | --- |
-| GBP | United Kingdom | 21 |
-| EUR | Italy (euro rates vary by country; Italy has the widest coverage) | 15 |
-| USD | United States | 13 |
-| CAD | Canada | 13 |
+| GBP | United Kingdom | 21, including UK specialists SonaliPay, RizRemit, REMITnGO (BRAC Saajan), NEC Money and RemitChoice |
+| EUR | Italy (euro rates vary by country; Italy has the widest coverage) | 16, including National Exchange Co. |
+| USD | United States | 15, including Pangea and Sonali Exchange |
+| CAD | Canada | 14, including BMO |
 
 The logo is a ranked list in miniature: three routes, shortest at the bottom, with the best one in gold and heading out as an arrow.
 
@@ -47,7 +47,8 @@ Some services are covered through another source when their own calculator is un
 | --- | --- |
 | Remitly, Instarem, Western Union | Own calculator, falling back to Wise's published comparison data |
 | TransferGo (GBP) | Own calculator, falling back to NALA's rate feed |
-| Skrill (GBP) | Wise's comparison data only |
+| Skrill (GBP), BMO (CAD) | Wise's comparison data only |
+| Sonali Exchange (USD), National Exchange Co. (EUR) | The rates page on their own website |
 
 ## Develop
 
@@ -79,7 +80,8 @@ Every request to a provider carries an `X-Open-Source-Client: Remittance Rate Co
 - Vercel runs on datacenter IPs, which some bot protection treats more strictly than home connections. MoneyGram and Xoom currently block requests from Vercel, and Remitly's own calculator does too (it falls back to Wise's comparison data).
 - XE's quote response states that automatic extraction of rates is prohibited under its Terms of Use. To drop XE, remove it from `src/lib/providers/index.ts`.
 - First-transfer promotions are shown as notes; the ranking uses regular pricing where the provider exposes it.
-- Not included: ACE Money Transfer (Cloudflare blocks non-browser requests), LemFi (obfuscates its rate), Small World (stopped trading in 2024), BA Exchange (only publishes an indicative rate).
+- National Exchange Co. doesn't publish its fees, so its fee shows as "Not listed" and it's never marked as giving the most taka after fees.
+- Not included: ACE Money Transfer, Remitbee and Placid Express (Cloudflare blocks non-browser requests), Boss Revolution (its calculator needs a private API key), LemFi (obfuscates its rate), Small World (stopped trading in 2024), BA Exchange (only publishes an indicative rate).
 
 ## Author
 

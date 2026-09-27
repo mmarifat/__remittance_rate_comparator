@@ -60,6 +60,19 @@ describe("buildOffers", () => {
     expect(mostTaka(offers)?.provider.id).toBe("lower-rate-no-fee");
   });
 
+  it("never calls an offer with an unpublished fee the one with most taka", () => {
+    const offers = buildOffers(
+      snapshot([
+        provider("fee-unknown", [{ ...q(100, 165, 0), feeUnknown: true }]),
+        provider("known", [q(100, 162, 1)]),
+      ]),
+      100,
+      "bank",
+    );
+    expect(offers[0].provider.id).toBe("fee-unknown");
+    expect(mostTaka(offers)?.provider.id).toBe("known");
+  });
+
   it("breaks rate ties by taka received", () => {
     const offers = buildOffers(
       snapshot([provider("fee", [q(100, 162, 1)]), provider("free", [q(100, 162, 0)])]),

@@ -38,9 +38,14 @@ export function buildOffers(snapshot: RatesSnapshot, amount: number, method: Del
   return offers.sort((a, b) => b.quote.rate - a.quote.rate || b.receive - a.receive);
 }
 
-/** The offer that delivers the most taka once fees are taken out, which isn't always the best rate. */
+/**
+ * The offer that delivers the most taka once fees are taken out, which isn't always the best rate.
+ * Offers with an unpublished fee can't be judged on this, so they're left out.
+ */
 export function mostTaka(offers: Offer[]): Offer | undefined {
-  return offers.reduce<Offer | undefined>((best, o) => (!best || o.receive > best.receive ? o : best), undefined);
+  return offers
+    .filter((o) => !o.quote.feeUnknown)
+    .reduce<Offer | undefined>((best, o) => (!best || o.receive > best.receive ? o : best), undefined);
 }
 
 /** Delivery methods that at least one of these working providers quotes for. */

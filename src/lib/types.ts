@@ -9,6 +9,8 @@ export interface Quote {
   /** Fee, in the sending currency, for sending `sendAmount`. */
   fee: number;
   method: DeliveryMethod;
+  /** Set when the provider doesn't publish its fee; `fee` is then 0 and shouldn't be trusted. */
+  feeUnknown?: boolean;
 }
 
 export interface ProviderResult {
