@@ -40,6 +40,7 @@ describe("headlineRate", () => {
 describe("toRecord", () => {
   it("keeps one rate per provider, null for failures", () => {
     const record = toRecord({
+      corridor: "GBP-BDT",
       updatedAt: "2026-09-26T10:00:00Z",
       midMarket: 163,
       providers: [provider("a", [q(1000, 162)]), provider("b", [], "error")],

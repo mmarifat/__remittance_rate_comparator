@@ -1,11 +1,17 @@
 import { num, postJson, request } from "./http";
+import { routeFor, urlsOf, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 import type { DeliveryMethod, Quote } from "../types";
 
 const BASE = "https://public.riamoneytransfer.com";
-// Without IsoCode the send country comes from IP geolocation, so a US server would get USD quotes.
-const HEADERS = { IsoCode: "GB", CultureCode: "en-GB" };
 const AMOUNT = 1000;
+
+const ROUTES: Routes = {
+  "GBP-BDT": { url: "https://www.riamoneytransfer.com/en-gb/send-money-to-bangladesh/" },
+  "EUR-BDT": { url: "https://www.riamoneytransfer.com/it-it/" },
+  "USD-BDT": { url: "https://www.riamoneytransfer.com/en-us/send-money-to-bangladesh/" },
+  "CAD-BDT": { url: "https://www.riamoneytransfer.com/en-ca/" },
+};
 
 const METHODS: [string, DeliveryMethod][] = [
   ["BankDeposit", "bank"],
@@ -20,9 +26,12 @@ interface Calculation {
 export const ria: ProviderDef = {
   id: "ria",
   name: "Ria",
-  url: "https://www.riamoneytransfer.com/en-gb/send-money-to-bangladesh/",
+  urls: urlsOf(ROUTES),
   domain: "riamoneytransfer.com",
-  async fetchQuotes() {
+  async fetchQuotes(corridor) {
+    routeFor(ROUTES, corridor);
+    // IsoCode sets the session's sending country; without it Ria geolocates the caller's IP.
+    const HEADERS = { IsoCode: corridor.sendCountry, CultureCode: "en-GB" };
     // Anonymous guest session; the token comes back in a response header.
     const session = await request(`${BASE}/Authorization/session`, { headers: HEADERS });
     const token = session.headers.get("bearer");
@@ -36,11 +45,11 @@ export const ria: ProviderDef = {
           `${BASE}/MoneyTransferCalculator/Calculate`,
           {
             selections: {
-              countryFrom: "GB",
+              countryFrom: corridor.sendCountry,
               countryTo: "BD",
               amountFrom: AMOUNT,
-              currencyFrom: "GBP",
-              currencyTo: "BDT",
+              currencyFrom: corridor.from,
+              currencyTo: corridor.to,
               paymentMethod: "DebitCard",
               deliveryMethod,
             },

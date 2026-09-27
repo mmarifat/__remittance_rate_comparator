@@ -1,11 +1,35 @@
 // Bangladesh groups digits in lakhs and crores (1,63,450), same as the en-IN locale.
 const bdt = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
-const gbp = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" });
-const gbpWhole = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
 
 export const formatBdt = (n: number) => `৳${bdt.format(Math.round(n))}`;
 
-export const formatGbp = (n: number) => (Number.isInteger(n) ? gbpWhole.format(n) : gbp.format(n));
+// Building an Intl.NumberFormat is slow and these run for every row on every render, so reuse them.
+const moneyFormats = new Map<string, Intl.NumberFormat>();
+
+function moneyFormat(currency: string, decimals: 0 | 2): Intl.NumberFormat {
+  const key = `${currency}-${decimals}`;
+  let format = moneyFormats.get(key);
+  if (!format) {
+    format = new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+    moneyFormats.set(key, format);
+  }
+  return format;
+}
+
+/** An amount in the sending currency: £1,000 / €3.99 / US$25 / CA$1,000 (pence dropped on whole amounts). */
+export function formatMoney(n: number, currency: string): string {
+  return moneyFormat(currency, Number.isInteger(n) ? 0 : 2).format(n);
+}
+
+/** The symbol en-GB readers expect: £, €, US$, CA$. */
+export function currencySymbol(currency: string): string {
+  return moneyFormat(currency, 0).formatToParts(0).find((p) => p.type === "currency")?.value ?? currency;
+}
 
 export const formatRate = (n: number) => n.toFixed(2);
 

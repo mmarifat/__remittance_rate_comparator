@@ -17,7 +17,7 @@ interface SonaliQuote {
 export const sonalipay: ProviderDef = {
   id: "sonalipay",
   name: "SonaliPay",
-  url: "https://www.sonalipay.co.uk/",
+  urls: { "GBP-BDT": "https://www.sonalipay.co.uk/" },
   domain: "sonalipay.co.uk",
   fetchQuotes: () =>
     atTiers(async (amount) => {

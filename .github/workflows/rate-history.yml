@@ -30,9 +30,14 @@ jobs:
           fi
           # Vercel reads vercel.json from the branch it would deploy, so this keeps it from building `data`.
           printf '{\n  "git": { "deploymentEnabled": false }\n}\n' > data-branch/vercel.json
+          # One-time move from the single-corridor history.json to one file per corridor.
+          if [ -f data-branch/history.json ] && [ ! -f data-branch/history/GBP-BDT.json ]; then
+            mkdir -p data-branch/history
+            git -C data-branch mv history.json history/GBP-BDT.json
+          fi
 
       - name: Record rates and update provider-health issues
-        run: bun scripts/record-rates.ts data-branch/history.json
+        run: bun scripts/record-rates.ts data-branch/history
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -41,7 +46,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add history.json vercel.json
+          git add -A
           if ! git diff --cached --quiet; then
             git commit -m "Record rates"
             git push origin data

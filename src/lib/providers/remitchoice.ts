@@ -12,7 +12,7 @@ const AMOUNT = 1000;
 export const remitchoice: ProviderDef = {
   id: "remitchoice",
   name: "RemitChoice",
-  url: "https://www.remitchoice.com/fee-free-send-money-to/bangladesh",
+  urls: { "GBP-BDT": "https://www.remitchoice.com/fee-free-send-money-to/bangladesh" },
   domain: "remitchoice.com",
   async fetchQuotes() {
     const quotes: Quote[] = [];

@@ -4,7 +4,7 @@ import type { ProviderDef } from "./types";
 export const necmoney: ProviderDef = {
   id: "necmoney",
   name: "NEC Money",
-  url: "https://www.necmoney.com/",
+  urls: { "GBP-BDT": "https://www.necmoney.com/" },
   domain: "necmoney.com",
   async fetchQuotes() {
     const res = await postJson<{ issueRate: number; fee: number }>("https://www.necmoney.com/api/rate", {

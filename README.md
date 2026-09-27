@@ -5,7 +5,7 @@
 <h1 align="center">Remittance Rate Comparator</h1>
 
 <p align="center">
-  Live GBP → BDT rates from 21 money transfer services, best rate first.<br>
+  Live money transfer rates to Bangladesh from the UK, eurozone, US and Canada, best rate first.<br>
   <a href="https://remittance-rate-comparator.vercel.app"><strong>remittance-rate-comparator.vercel.app</strong></a>
 </p>
 
@@ -15,22 +15,29 @@
   <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/contributions-welcome-f5c04a" alt="Contributions welcome"></a>
 </p>
 
-Pick an amount and a payout method (bank account, bKash / wallet, or cash pickup), and see what each service gives for pounds sent to Bangladesh: the rate, the fee, and the taka the recipient gets. GBP → BDT is the only corridor for now.
+Pick the currency you send, an amount and a payout method (bank account, bKash / wallet, or cash pickup), and see what each service gives: the rate, the fee, and the taka the recipient gets.
+
+| You send | Sending from | Services |
+| --- | --- | --- |
+| GBP | United Kingdom | 21 |
+| EUR | Italy (euro rates vary by country; Italy has the widest coverage) | 15 |
+| USD | United States | 13 |
+| CAD | Canada | 13 |
 
 The logo is a ranked list in miniature: three routes, shortest at the bottom, with the best one in gold and heading out as an arrow.
 
 ## How it works
 
-- `src/lib/providers/` has one file per service. Each one calls that service's public price calculator (the same request its website makes) and returns quotes as `{ sendAmount, rate, fee, method }`.
+- `src/lib/corridors.ts` lists the corridors. `src/lib/providers/` has one file per service with a `ROUTES` table: for each corridor it serves, the page users start on and the request details that corridor needs. Each file calls that service's public price calculator (the same request its website makes) and returns quotes as `{ sendAmount, rate, fee, method }`, in the sending currency.
 - `src/lib/snapshot.ts` queries every provider in parallel, caps each one at 20s, drops rates that are more than 10% away from mid-market (a sign the response format changed), and records failures without breaking the rest.
-- `/api/rates?stream=1` sends each provider as newline-delimited JSON the moment it answers, so the list fills in progressively instead of waiting for the slowest service. `/api/rates` without `stream` returns the whole snapshot as JSON.
+- `/api/rates?corridor=EUR-BDT&stream=1` sends each provider as newline-delimited JSON the moment it answers, so the list fills in progressively instead of waiting for the slowest service. `/api/rates` without `stream` returns the whole snapshot as JSON.
 - Both serve the check with a 2-minute cache: Vercel's CDN shares one response across visitors, and each server instance keeps its latest result in memory, so providers are asked at most about once every 2 minutes however busy the site gets. The page calls it on load and when you press Refresh, and a yellow banner suggests refreshing once the rates on screen are 10 minutes old.
 - Amounts are compared for the same total spend: the fee comes out of what you pay, and the rest is converted.
-- The amount and payout method are kept in the address (`?amount=500&method=wallet`), so a comparison can be shared as a link.
+- The currency, amount and payout method are kept in the address (`?from=USD&amount=500&method=wallet`), so a comparison can be shared as a link.
 
 ### Rate history and provider health
 
-`.github/workflows/rate-history.yml` runs every hour. It reads the live site's `/api/rates` (so it adds no load on providers), appends each provider's headline rate to [`history.json` on the `data` branch](../../blob/data/history.json), and keeps 30 days. The page shows the last 7 days as a trend per provider, served through `/api/history`.
+`.github/workflows/rate-history.yml` runs every hour. It reads the live site's `/api/rates` (so it adds no load on providers), appends each provider's headline rate to one file per corridor in [`history/` on the `data` branch](../../tree/data/history), and keeps 30 days. The page shows the last 7 days as a trend per provider, served through `/api/history`.
 
 The same job watches provider health: if a provider fails every check for 6 hours, it opens a GitHub issue labelled `provider-health`, and closes it when the provider answers again.
 
@@ -39,8 +46,8 @@ Some services are covered through another source when their own calculator is un
 | Service | Source |
 | --- | --- |
 | Remitly, Instarem, Western Union | Own calculator, falling back to Wise's published comparison data |
-| TransferGo | Own calculator, falling back to NALA's rate feed |
-| Skrill | Wise's comparison data only |
+| TransferGo (GBP) | Own calculator, falling back to NALA's rate feed |
+| Skrill (GBP) | Wise's comparison data only |
 
 ## Develop
 
@@ -48,7 +55,8 @@ Some services are covered through another source when their own calculator is un
 bun install
 bun run dev              # http://localhost:3000
 bun run test             # vitest
-bun run check:providers  # query every provider once and print the results
+bun run check:providers          # query every GBP provider once and print the results
+bun run check:providers USD-BDT  # one corridor, or `all`
 ```
 
 `check:providers` is the quickest way to see which provider has broken after a site change. Don't run it in a tight loop: several providers rate-limit (TransferGo's Cloudflare blocks an IP for an hour after a burst).

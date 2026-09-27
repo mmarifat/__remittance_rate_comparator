@@ -1,3 +1,4 @@
+import type { Corridor } from "../corridors";
 import { atTiers, getJson, num } from "./http";
 import type { ProviderDef } from "./types";
 
@@ -13,23 +14,25 @@ interface Comparison {
 
 const NOTE = "Price via Wise's comparison, up to 1 hr old";
 
-const recent = new Map<number, { at: number; promise: Promise<Comparison> }>();
+const recent = new Map<string, { at: number; promise: Promise<Comparison> }>();
 
-// Several providers read the same response, so share one request per amount per snapshot.
-function comparison(amount: number): Promise<Comparison> {
-  const hit = recent.get(amount);
+// Several providers read the same response, so share one request per currency and amount per snapshot.
+function comparison(corridor: Corridor, amount: number): Promise<Comparison> {
+  const key = `${corridor.id}-${corridor.sendCountry}-${amount}`;
+  const hit = recent.get(key);
   if (hit && Date.now() - hit.at < 60_000) return hit.promise;
   const promise = getJson<Comparison>(
-    `https://wise.com/gateway/v3/comparisons?sourceCurrency=GBP&targetCurrency=BDT&sendAmount=${amount}`,
+    // sourceCountry matters for euros: the providers and prices listed differ by eurozone country.
+    `https://wise.com/gateway/v3/comparisons?sourceCurrency=${corridor.from}&targetCurrency=${corridor.to}&sourceCountry=${corridor.sendCountry}&sendAmount=${amount}`,
   );
-  recent.set(amount, { at: Date.now(), promise });
-  promise.catch(() => recent.delete(amount));
+  recent.set(key, { at: Date.now(), promise });
+  promise.catch(() => recent.delete(key));
   return promise;
 }
 
-function comparisonQuotes(alias: string) {
+function comparisonQuotes(corridor: Corridor, alias: string) {
   return atTiers(async (amount) => {
-    const quote = (await comparison(amount)).providers.find((p) => p.alias === alias)?.quotes[0];
+    const quote = (await comparison(corridor, amount)).providers.find((p) => p.alias === alias)?.quotes[0];
     if (!quote) throw new Error("Not in Wise's comparison data");
     return { sendAmount: amount, rate: num(quote.rate), fee: num(quote.fee), method: "bank" as const };
   });
@@ -37,19 +40,19 @@ function comparisonQuotes(alias: string) {
 
 export function viaWiseComparison(def: Omit<ProviderDef, "fetchQuotes"> & { alias: string }): ProviderDef {
   const { alias, ...rest } = def;
-  return { note: NOTE, ...rest, fetchQuotes: () => comparisonQuotes(alias) };
+  return { note: NOTE, ...rest, fetchQuotes: (corridor) => comparisonQuotes(corridor, alias) };
 }
 
 /** Try the provider's own calculator first; if it fails, use Wise's copy of its bank-transfer price. */
 export function withWiseFallback(def: ProviderDef, alias: string): ProviderDef {
   return {
     ...def,
-    async fetchQuotes() {
+    async fetchQuotes(corridor) {
       try {
-        return await def.fetchQuotes();
+        return await def.fetchQuotes(corridor);
       } catch (err) {
         try {
-          return { quotes: await comparisonQuotes(alias), note: NOTE };
+          return { quotes: await comparisonQuotes(corridor, alias), note: NOTE };
         } catch {
           throw err;
         }

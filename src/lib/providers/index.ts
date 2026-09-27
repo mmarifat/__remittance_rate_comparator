@@ -50,7 +50,7 @@ export const providers: ProviderDef[] = [
     id: "skrill",
     alias: "skrill",
     name: "Skrill",
-    url: "https://www.skrill.com/en/money-transfer/send-money-to-bangladesh/",
+    urls: { "GBP-BDT": "https://www.skrill.com/en/money-transfer/send-money-to-bangladesh/" },
     domain: "skrill.com",
   }),
 ];

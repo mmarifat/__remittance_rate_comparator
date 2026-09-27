@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAgo, formatBdt, formatGbp } from "./format";
+import { currencySymbol, formatAgo, formatBdt, formatMoney } from "./format";
 
 describe("format", () => {
   it("groups taka in lakhs", () => {
@@ -7,9 +7,16 @@ describe("format", () => {
     expect(formatBdt(12345678)).toBe("৳1,23,45,678");
   });
 
-  it("drops pence on whole pounds only", () => {
-    expect(formatGbp(1000)).toBe("£1,000");
-    expect(formatGbp(3.99)).toBe("£3.99");
+  it("formats the sending currency, dropping pence on whole amounts only", () => {
+    expect(formatMoney(1000, "GBP")).toBe("£1,000");
+    expect(formatMoney(3.99, "GBP")).toBe("£3.99");
+    expect(formatMoney(1000, "EUR")).toBe("€1,000");
+    expect(formatMoney(2.5, "USD")).toBe("US$2.50");
+    expect(formatMoney(1000, "CAD")).toBe("CA$1,000");
+  });
+
+  it("gives the symbol for the amount field", () => {
+    expect(["GBP", "EUR", "USD", "CAD"].map(currencySymbol)).toEqual(["£", "€", "US$", "CA$"]);
   });
 
   it("describes how long ago rates were fetched", () => {

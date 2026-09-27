@@ -4,7 +4,7 @@ import type { ProviderDef } from "./types";
 export const rizremit: ProviderDef = {
   id: "rizremit",
   name: "RizRemit",
-  url: "https://rizremit.com/en-uk/send-money-to-bangladesh",
+  urls: { "GBP-BDT": "https://rizremit.com/en-uk/send-money-to-bangladesh" },
   domain: "rizremit.com",
   async fetchQuotes() {
     // The rate and flat fee are server-rendered into the corridor page.

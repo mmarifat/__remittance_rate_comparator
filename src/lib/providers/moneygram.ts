@@ -1,4 +1,5 @@
 import { atTiers, getJson, num } from "./http";
+import { routeFor, urlsOf, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 
 interface FeeQuote {
@@ -7,17 +8,26 @@ interface FeeQuote {
   };
 }
 
+/** MoneyGram uses ISO 3166 alpha-3 country codes. */
+const ROUTES: Routes<{ country: string }> = {
+  "GBP-BDT": { url: "https://www.moneygram.com/gb/en/corridor/bangladesh", country: "GBR" },
+  "EUR-BDT": { url: "https://www.moneygram.com/it/en/corridor/bangladesh", country: "ITA" },
+  "USD-BDT": { url: "https://www.moneygram.com/us/en/corridor/bangladesh", country: "USA" },
+  "CAD-BDT": { url: "https://www.moneygram.com/ca/en/corridor/bangladesh", country: "CAN" },
+};
+
 export const moneygram: ProviderDef = {
   id: "moneygram",
   name: "MoneyGram",
-  url: "https://www.moneygram.com/gb/en/corridor/bangladesh",
+  urls: urlsOf(ROUTES),
   domain: "moneygram.com",
-  async fetchQuotes() {
+  async fetchQuotes(corridor) {
+    const { country } = routeFor(ROUTES, corridor);
     let promo: { fxRate: number; sendFee: number } | undefined;
     const quotes = await atTiers(async (amount) => {
       // Without these language headers their bot protection answers 403.
       const res = await getJson<FeeQuote>(
-        `https://www.moneygram.com/api/send-money/fee-quote/v2?senderCountryCode=GBR&senderCurrencyCode=GBP&receiverCountryCode=BGD&receiverCurrencyCode=BDT&sendAmount=${amount.toFixed(2)}`,
+        `https://www.moneygram.com/api/send-money/fee-quote/v2?senderCountryCode=${country}&senderCurrencyCode=${corridor.from}&receiverCountryCode=BGD&receiverCurrencyCode=${corridor.to}&sendAmount=${amount.toFixed(2)}`,
         { headers: { "Accept-Language": "en-gb", "locale-header": "en-gb" } },
       );
       const bdt = res.feeQuotesByCurrency.BDT;

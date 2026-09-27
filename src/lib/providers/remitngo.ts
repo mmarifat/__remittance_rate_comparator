@@ -17,7 +17,7 @@ const AMOUNT = 1000;
 export const remitngo: ProviderDef = {
   id: "remitngo",
   name: "REMITnGO (BRAC Saajan)",
-  url: "https://remitngo.com/",
+  urls: { "GBP-BDT": "https://remitngo.com/" },
   domain: "remitngo.com",
   async fetchQuotes() {
     // The calculator is a WordPress AJAX action guarded by a nonce printed on the home page.

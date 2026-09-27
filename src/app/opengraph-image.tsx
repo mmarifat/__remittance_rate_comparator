@@ -2,14 +2,14 @@ import { ImageResponse } from "next/og";
 import { logoDataUri } from "@/lib/logo";
 import { SITE_NAME } from "@/lib/site";
 
-export const alt = `${SITE_NAME}: live GBP to BDT rates, best rate first`;
+export const alt = `${SITE_NAME}: live money transfer rates to Bangladesh, best rate first`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 // Share card: the logo, the name, and what the list does.
 export default async function Image() {
   const logo = await logoDataUri();
-  const rows = ["Best rate first", "Fees included", "21 services"];
+  const rows = ["Best rate first", "Fees included", "4 currencies"];
   return new ImageResponse(
     (
       <div
@@ -27,7 +27,7 @@ export default async function Image() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
           <img src={logo} width={72} height={72} alt="" style={{ borderRadius: 18, boxShadow: "0 0 0 3px rgba(238,247,242,0.35)" }} />
-          <div style={{ fontSize: 34, opacity: 0.85 }}>GBP → BDT · live rates</div>
+          <div style={{ fontSize: 34, opacity: 0.85 }}>GBP · EUR · USD · CAD → BDT</div>
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{ fontSize: 92, fontWeight: 700, lineHeight: 1.02, letterSpacing: -2 }}>Remittance</div>

@@ -2,11 +2,11 @@ export type DeliveryMethod = "bank" | "wallet" | "cash";
 
 /** One price point from a provider. */
 export interface Quote {
-  /** GBP amount the quote was requested for. */
+  /** Amount, in the sending currency, the quote was requested for. */
   sendAmount: number;
-  /** BDT the recipient gets per £1 sent. */
+  /** BDT the recipient gets per unit of the sending currency. */
   rate: number;
-  /** GBP fee for sending `sendAmount`. */
+  /** Fee, in the sending currency, for sending `sendAmount`. */
   fee: number;
   method: DeliveryMethod;
 }
@@ -27,15 +27,17 @@ export interface ProviderResult {
 
 /** One line of the /api/rates?stream=1 response (newline-delimited JSON). */
 export type RatesEvent =
-  | { type: "start"; updatedAt: string; total: number }
+  | { type: "start"; corridor: string; updatedAt: string; total: number }
   | { type: "midMarket"; midMarket: number | null }
   | { type: "provider"; provider: ProviderResult }
   | { type: "done" };
 
 export interface RatesSnapshot {
+  /** Which route these rates are for, e.g. "GBP-BDT". */
+  corridor: string;
   /** ISO timestamp of when the providers were queried. */
   updatedAt: string;
-  /** Mid-market GBP→BDT rate, or null if it couldn't be fetched. */
+  /** Mid-market rate for the corridor, or null if it couldn't be fetched. */
   midMarket: number | null;
   providers: ProviderResult[];
 }

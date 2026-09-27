@@ -19,6 +19,7 @@ const provider = (id: string, quotes: Quote[], status: ProviderResult["status"] 
 });
 
 const snapshot = (providers: ProviderResult[]): RatesSnapshot => ({
+  corridor: "GBP-BDT",
   updatedAt: "2026-09-26T10:00:00Z",
   midMarket: 163,
   providers,

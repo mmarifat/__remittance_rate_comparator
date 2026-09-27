@@ -18,12 +18,17 @@ const hind = Hind_Siliguri({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: `${SITE_NAME}: live GBP to BDT rates`,
+  title: `${SITE_NAME}: live money transfer rates to Bangladesh`,
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
   keywords: [
     "GBP to BDT",
+    "EUR to BDT",
+    "USD to BDT",
+    "CAD to BDT",
     "pound to taka",
+    "dollar to taka",
+    "euro to taka",
     "send money to Bangladesh",
     "remittance Bangladesh",
     "UK to Bangladesh exchange rate",
@@ -47,13 +52,13 @@ export const metadata: Metadata = {
     type: "website",
     url: "/",
     siteName: SITE_NAME,
-    title: `${SITE_NAME}: live GBP to BDT rates`,
+    title: `${SITE_NAME}: live money transfer rates to Bangladesh`,
     description: SITE_DESCRIPTION,
     locale: "en_GB",
   },
   twitter: {
     card: "summary_large_image",
-    title: `${SITE_NAME}: live GBP to BDT rates`,
+    title: `${SITE_NAME}: live money transfer rates to Bangladesh`,
     description: SITE_DESCRIPTION,
   },
 };
