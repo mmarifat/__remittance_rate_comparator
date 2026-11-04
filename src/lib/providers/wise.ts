@@ -14,6 +14,10 @@ const ROUTES: Routes = {
   "EUR-BDT": { url: "https://wise.com/gb/currency-converter/eur-to-bdt-rate" },
   "USD-BDT": { url: "https://wise.com/us/currency-converter/usd-to-bdt-rate" },
   "CAD-BDT": { url: "https://wise.com/ca/currency-converter/cad-to-bdt-rate" },
+  "GBP-PKR": { url: "https://wise.com/gb/currency-converter/gbp-to-pkr-rate" },
+  "EUR-PKR": { url: "https://wise.com/gb/currency-converter/eur-to-pkr-rate" },
+  "USD-PKR": { url: "https://wise.com/us/currency-converter/usd-to-pkr-rate" },
+  "CAD-PKR": { url: "https://wise.com/ca/currency-converter/cad-to-pkr-rate" },
 };
 
 export const wise: ProviderDef = {

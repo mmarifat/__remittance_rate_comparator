@@ -18,7 +18,7 @@ const hind = Hind_Siliguri({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: `${SITE_NAME}: live money transfer rates to Bangladesh`,
+  title: `${SITE_NAME}: live money transfer rates to Bangladesh and Pakistan`,
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
   keywords: [
@@ -26,10 +26,17 @@ export const metadata: Metadata = {
     "EUR to BDT",
     "USD to BDT",
     "CAD to BDT",
+    "GBP to PKR",
+    "EUR to PKR",
+    "USD to PKR",
+    "CAD to PKR",
     "pound to taka",
     "dollar to taka",
     "euro to taka",
+    "pound to rupee Pakistan",
     "send money to Bangladesh",
+    "send money to Pakistan",
+    "remittance Pakistan",
     "remittance Bangladesh",
     "UK to Bangladesh exchange rate",
     "best taka rate",
@@ -40,6 +47,8 @@ export const metadata: Metadata = {
     "RizRemit",
     "Western Union",
     "bKash",
+    "JazzCash",
+    "Easypaisa",
   ],
   authors: [
     { name: AUTHOR.name, url: AUTHOR.github },
@@ -52,13 +61,13 @@ export const metadata: Metadata = {
     type: "website",
     url: "/",
     siteName: SITE_NAME,
-    title: `${SITE_NAME}: live money transfer rates to Bangladesh`,
+    title: `${SITE_NAME}: live money transfer rates to Bangladesh and Pakistan`,
     description: SITE_DESCRIPTION,
     locale: "en_GB",
   },
   twitter: {
     card: "summary_large_image",
-    title: `${SITE_NAME}: live money transfer rates to Bangladesh`,
+    title: `${SITE_NAME}: live money transfer rates to Bangladesh and Pakistan`,
     description: SITE_DESCRIPTION,
   },
 };

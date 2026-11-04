@@ -1,4 +1,4 @@
-import { COUNTRIES } from "../corridors";
+import { COUNTRIES, destinationOf, type Corridor, type CountryCode } from "../corridors";
 import { formatMoney } from "../format";
 import { getJson, num } from "./http";
 import { routeFor, urlsFrom, type Routes } from "./routes";
@@ -27,8 +27,12 @@ const METHODS: Record<string, DeliveryMethod> = {
 // delivery method from it. Fees are flat, so one amount is enough.
 const AMOUNT = 1000;
 
-const url = (country: string) => `https://www.remitly.com/${country.toLowerCase()}/en/bangladesh`;
-const ROUTES: Routes = { "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url } };
+const url = (country: CountryCode, corridor: Corridor) =>
+  `https://www.remitly.com/${country.toLowerCase()}/en/${destinationOf(corridor).slug}`;
+const ROUTES: Routes = {
+  "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url },
+  "GBP-PKR": { url }, "EUR-PKR": { url }, "USD-PKR": { url }, "CAD-PKR": { url },
+};
 
 export const remitly: ProviderDef = {
   id: "remitly",
@@ -38,7 +42,7 @@ export const remitly: ProviderDef = {
   async fetchQuotes(corridor) {
     routeFor(ROUTES, corridor);
     // Remitly's route code: sending country:currency - receiving country:currency, e.g. ESP:EUR-BGD:BDT.
-    const conduit = `${COUNTRIES[corridor.sendCountry].iso3}:${corridor.from}-BGD:${corridor.to}`;
+    const conduit = `${COUNTRIES[corridor.sendCountry].iso3}:${corridor.from}-${destinationOf(corridor).iso3}:${corridor.to}`;
     const res = await getJson<RemitlyResponse>(
       `https://api.remitly.io/v3/calculator/estimate?conduit=${encodeURIComponent(conduit)}&anchor=SEND&amount=${AMOUNT}&purpose=OTHER&customer_segment=UNRECOGNIZED&strict_promo=false`,
     );

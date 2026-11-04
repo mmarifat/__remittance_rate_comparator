@@ -1,9 +1,9 @@
 # Contributing
 
-Thanks for helping people get more taka for their pounds. The most useful contributions are:
+Thanks for helping people get more taka and rupees for their money. The most useful contributions are:
 
 - **Fixing a broken provider.** Providers change their websites, and a provider that stops answering shows up under "Couldn't check just now". After 6 hours of failures, an issue labelled [`provider-health`](../../issues?q=label%3Aprovider-health) opens automatically; those are good first issues.
-- **Adding a provider** that sends money to Bangladesh from the UK, eurozone, US or Canada.
+- **Adding a provider** that sends money to Bangladesh or Pakistan from the UK, eurozone, US or Canada.
 - **Adding a corridor to a provider** that already serves it but isn't switched on here yet.
 - **Improving the page**: accessibility, layout, wording.
 
@@ -24,8 +24,9 @@ bun run check:providers  # query every provider once and print what came back
 Each provider is one file in `src/lib/providers/` that exports a `ProviderDef`:
 
 ```ts
+import { destinationOf } from "../corridors";
 import { atTiers, getJson, num } from "./http";
-import { routeFor, urlsOf, type Routes } from "./routes";
+import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 
 // One entry per corridor this provider serves: the page users start a transfer on (a function when it
@@ -34,12 +35,14 @@ import type { ProviderDef } from "./types";
 const ROUTES: Routes<{ product: string }> = {
   "GBP-BDT": { url: "https://example.com/gb/bangladesh", product: "uk-bd" },
   "EUR-BDT": { url: (country) => `https://example.com/${country.toLowerCase()}/bangladesh`, product: "eu-bd", countries: ["IT", "ES"] },
+  // The url function also gets the corridor, so one function can cover every destination.
+  "GBP-PKR": { url: (_country, corridor) => `https://example.com/gb/${destinationOf(corridor).slug}`, product: "uk-pk" },
 };
 
 export const example: ProviderDef = {
   id: "example",
   name: "Example Remit",
-  urls: urlsOf(ROUTES),
+  urlFor: urlsFrom(ROUTES),
   domain: "example.com", // used to show the logo
   fetchQuotes: (corridor) => {
     const { product } = routeFor(ROUTES, corridor);
@@ -53,17 +56,17 @@ export const example: ProviderDef = {
 };
 ```
 
-Then add it to the list in `src/lib/providers/index.ts` and run `bun run check:providers <corridor>` (e.g. `USD-BDT`, or `all`). A provider is only checked for the corridors in its `ROUTES`, so only add a corridor once you've seen its request return a real quote.
+Then add it to the list in `src/lib/providers/index.ts` and run `bun run check:providers <corridor>` (e.g. `USD-BDT`, `GBP-PKR`, or `all`). A provider is only checked for the corridors in its `ROUTES`, so only add a corridor once you've seen its request return a real quote.
 
 Things to know:
 
-- `rate` is BDT per unit of the sending currency and `fee` is in the sending currency. `method` is `"bank"`, `"wallet"` (bKash and similar) or `"cash"`.
-- `corridor` gives you `from` (e.g. `"EUR"`), `to` (`"BDT"`) and `sendCountry` (ISO alpha-2, e.g. `"ES"` when a euro sender picks Spain). `COUNTRIES` in `src/lib/corridors.ts` has each country's alpha-3 and numeric codes for APIs that want those.
+- `rate` is the receiving currency (BDT or PKR) per unit of the sending currency, and `fee` is in the sending currency. `method` is `"bank"`, `"wallet"` (bKash, JazzCash, Easypaisa and similar) or `"cash"`.
+- `corridor` gives you `from` (e.g. `"EUR"`), `to` (`"BDT"` or `"PKR"`) and `sendCountry` (ISO alpha-2, e.g. `"ES"` when a euro sender picks Spain). `COUNTRIES` in `src/lib/corridors.ts` has each sending country's alpha-3 and numeric codes, and `destinationOf(corridor)` gives the receiving country's (`country`, `iso3`, `numeric`, `slug`, `countryName`). Never hardcode `"BD"`.
 - If the provider shows a first-transfer deal, attach it as `promo: { rate?, fee?, upTo? }` on the quote (see `remitly.ts`); "I'm a new customer" uses it.
 - If a provider prices each way of paying separately (card, bank transfer, ...), use the cheapest non-crypto one, as `westernunion.ts` does.
 - If a provider publishes its rate but not its fee, set `fee: 0, feeUnknown: true` (see `nationalexchange.ts`). The page then shows the fee as "Not listed".
 - When a rate comes from a web page rather than an API, put the parsing in an exported function and add a test with a trimmed copy of the page to `src/lib/providers.test.ts`.
-- Use regular pricing, not first-transfer promotions. Put a promotion in `note` instead (see `remitly.ts`).
+- Use regular pricing, not first-transfer promotions. A response's headline price is often the promotional one (Sendwave's `effectiveExchangeRate`, WorldRemit's `value` next to a `crossedOutValue`); take the regular price for `rate` and `fee`, and put the deal in `promo` (see `sendwave.ts`).
 - If the price depends on the amount, quote a few amounts with `atTiers`. If it doesn't, return one quote.
 - Always use the helpers in `http.ts` (`getJson`, `postJson`, `postForm`, `getText`, `request`), never bare `fetch`. They add the `X-Open-Source-Client` header that tells providers who is asking, plus a timeout and a retry on HTTP 429.
 - Rates more than 10% away from mid-market are dropped automatically, so a mistake in parsing won't show a wrong rate.

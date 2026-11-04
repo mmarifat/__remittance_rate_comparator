@@ -1,6 +1,6 @@
 import {
-  corridorFrom,
   DEFAULT_CORRIDOR,
+  findCorridor,
   getCorridor,
   inCountry,
   type CorridorId,
@@ -42,7 +42,8 @@ export function homeFor(countryCode: string | null | undefined): Home {
     const eur = inCountry(getCorridor("EUR-BDT")!, code);
     return { corridorId: eur.id as CorridorId, country: eur.sendCountry };
   }
-  const own = { US: "USD-BDT", CA: "CAD-BDT", GB: "GBP-BDT" }[code] as CorridorId | undefined;
+  // Someone in Pakistan is most likely looking up what family abroad can send them.
+  const own = { US: "USD-BDT", CA: "CAD-BDT", GB: "GBP-BDT", PK: "GBP-PKR" }[code] as CorridorId | undefined;
   const corridor = getCorridor(own ?? DEFAULT_CORRIDOR)!;
   return { corridorId: corridor.id, country: corridor.sendCountry };
 }
@@ -57,10 +58,15 @@ const first = (value: string | string[] | undefined) => (Array.isArray(value) ? 
 
 /** Reads a (possibly shared) address, falling back to the visitor's home for anything missing or invalid. */
 export function parseLink(params: Params, home: Home): LinkState {
-  const fromParam = corridorFrom(first(params.from));
-  const corridor = fromParam ?? getCorridor(home.corridorId)!;
-  // A link's own currency starts from that currency's default country, not the visitor's.
-  const baseCountry = fromParam && fromParam.id !== home.corridorId ? corridor.sendCountry : home.country;
+  const homeCorridor = getCorridor(home.corridorId)!;
+  // Either side can be left out of a link; each falls back to the visitor's home independently.
+  const corridor =
+    findCorridor(first(params.from) ?? homeCorridor.from, first(params.to) ?? homeCorridor.to) ??
+    findCorridor(first(params.from), homeCorridor.to) ??
+    findCorridor(homeCorridor.from, first(params.to)) ??
+    homeCorridor;
+  // A link's own sending currency starts from that currency's default country, not the visitor's.
+  const baseCountry = corridor.from === homeCorridor.from ? home.country : corridor.sendCountry;
   // An unusable ?country= falls back to baseCountry (not the corridor's default), so a Spanish visitor stays on Spain.
   const country = inCountry(inCountry(corridor, baseCountry), first(params.country)).sendCountry;
   const amount = first(params.amount) ?? "";
@@ -81,11 +87,28 @@ export function parseLink(params: Params, home: Home): LinkState {
  */
 export function linkQuery(state: LinkState, home: Home): string {
   const corridor = getCorridor(state.corridorId)!;
+  const homeCorridor = getCorridor(home.corridorId)!;
   const params = new URLSearchParams();
-  const sameCorridor = state.corridorId === home.corridorId;
-  if (!sameCorridor) params.set("from", corridor.from);
-  const countryDefault = sameCorridor ? home.country : corridor.sendCountry;
+  const sameSender = corridor.from === homeCorridor.from;
+  if (!sameSender) params.set("from", corridor.from);
+  if (corridor.to !== homeCorridor.to) params.set("to", corridor.to);
+  const countryDefault = sameSender ? home.country : corridor.sendCountry;
   if (state.country !== countryDefault) params.set("country", state.country);
+  if (state.amount !== DEFAULT_AMOUNT) params.set("amount", state.amount);
+  if (state.method !== DEFAULT_METHOD) params.set("method", state.method);
+  if (state.newCustomer) params.set("new", "1");
+  return params.toString();
+}
+
+/**
+ * The query for a link someone sends on. Unlike the address bar's, it always names both currencies
+ * and the sending country: the recipient's location decides their defaults, so a link that leaves
+ * them out could open on another corridor (a Pakistani visitor's GBP→PKR link opening as GBP→BDT in
+ * the UK).
+ */
+export function shareQuery(state: LinkState): string {
+  const corridor = getCorridor(state.corridorId)!;
+  const params = new URLSearchParams({ from: corridor.from, to: corridor.to, country: state.country });
   if (state.amount !== DEFAULT_AMOUNT) params.set("amount", state.amount);
   if (state.method !== DEFAULT_METHOD) params.set("method", state.method);
   if (state.newCustomer) params.set("new", "1");

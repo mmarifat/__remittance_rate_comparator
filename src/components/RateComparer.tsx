@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { availableMethods, buildOffers, mostTaka, type Offer } from "@/lib/compare";
+import { availableMethods, buildOffers, mostReceived, type Offer } from "@/lib/compare";
 import {
   appendRecord,
   bestRateTrend,
@@ -15,15 +15,18 @@ import {
   CORRIDORS,
   COUNTRIES,
   DEFAULT_CORRIDOR,
-  corridorFrom,
+  destinationOf,
+  DESTINATIONS,
+  findCorridor,
   getCorridor,
   inCountry,
   type Corridor,
   type CorridorId,
   type CountryCode,
+  type ReceiveCurrency,
 } from "@/lib/corridors";
-import { currencySymbol, formatAgo, formatBdt, formatMoney, formatRate } from "@/lib/format";
-import { isValidAmount, linkQuery, type Home, type LinkState } from "@/lib/link";
+import { currencySymbol, formatAgo, formatMoney, formatRate, formatReceive } from "@/lib/format";
+import { isValidAmount, linkQuery, shareQuery, type Home, type LinkState } from "@/lib/link";
 import { AUTHOR, REPO_URL, SITE_NAME } from "@/lib/site";
 import type { DeliveryMethod, ProviderResult, RatesEvent, RatesSnapshot } from "@/lib/types";
 import Image from "next/image";
@@ -33,20 +36,16 @@ import { Sparkline } from "./Sparkline";
 import { useFlip } from "./useFlip";
 import { useNow } from "./useNow";
 
-const METHOD_LABEL: Record<DeliveryMethod, string> = {
-  bank: "Bank account",
-  wallet: "bKash / wallet",
-  cash: "Cash pickup",
-};
+/** Wallets go by different names in each country, so the label comes from the destination. */
+function methodLabel(method: DeliveryMethod, to: ReceiveCurrency): string {
+  if (method === "wallet") return DESTINATIONS[to].walletLabel;
+  return method === "bank" ? "Bank account" : "Cash pickup";
+}
 
-const METHOD_PAYOUT: Record<DeliveryMethod, string> = {
-  bank: "bank account payout",
-  wallet: "bKash / wallet payout",
-  cash: "cash pickup",
-};
-
-// Corridors live in src/lib/corridors.ts; the "You send" list shows the ones with at least one provider.
-const RECEIVE_CURRENCIES = [{ value: "BDT", label: "BDT · Taka" }];
+function methodPayout(method: DeliveryMethod, to: ReceiveCurrency): string {
+  if (method === "wallet") return `${DESTINATIONS[to].walletLabel} payout`;
+  return method === "bank" ? "bank account payout" : "cash pickup";
+}
 
 /** After this long, a banner suggests refreshing because providers may have moved their rates. */
 const STALE_AFTER_MINUTES = 10;
@@ -88,10 +87,6 @@ export function RateComparer({
   home: Home;
 }) {
   const countFor = (c: Corridor) => providerCounts[`${c.id}:${c.sendCountry}`] ?? 0;
-  const sendCurrencies = CORRIDORS.filter((c) => countFor(c) > 0).map((c) => ({
-    value: c.from,
-    label: `${c.from} · ${c.currencyName}`,
-  }));
   const startsOnServedCorridor = countFor(inCountry(getCorridor(initial.corridorId)!, initial.country)) > 0;
   const [corridorId, setCorridorId] = useState<CorridorId>(
     startsOnServedCorridor ? initial.corridorId : DEFAULT_CORRIDOR,
@@ -104,6 +99,17 @@ export function RateComparer({
   // History is only recorded for each corridor's default sending country.
   const isDefaultCountry = corridor.sendCountry === baseCorridor.sendCountry;
   const currency = corridor.from;
+  const receiveCurrency = corridor.to;
+  const destination = destinationOf(corridor);
+  // Corridors live in src/lib/corridors.ts; each list shows the ones with at least one provider.
+  const sendCurrencies = CORRIDORS.filter((c) => c.to === receiveCurrency && countFor(c) > 0).map((c) => ({
+    value: c.from,
+    label: `${c.from} · ${c.currencyName}`,
+  }));
+  const receiveCurrencies = CORRIDORS.filter((c) => c.from === currency && countFor(c) > 0).map((c) => ({
+    value: c.to as string,
+    label: `${c.to} · ${DESTINATIONS[c.to].currencyName}`,
+  }));
   const [newCustomer, setNewCustomer] = useState(initial.newCustomer);
   const [latestSnapshot, setSnapshot] = useState<RatesSnapshot | null>(null);
   const [amountText, setAmountText] = useState(initial.amount);
@@ -125,7 +131,7 @@ export function RateComparer({
   const activeMethod = methods.includes(method) ? method : (methods[0] ?? "bank");
   const offers = snapshot ? buildOffers(snapshot, amount, activeMethod, { newCustomer }) : [];
   const hasDeals = snapshot?.providers.some((p) => p.quotes.some((q) => q.promo)) ?? false;
-  const mostTakaId = offers.length > 1 ? mostTaka(offers)?.provider.id : undefined;
+  const mostReceivedId = offers.length > 1 ? mostReceived(offers)?.provider.id : undefined;
 
   const listRef = useRef<HTMLOListElement>(null);
   useFlip(listRef, offers.map((o) => o.provider.id).join());
@@ -255,7 +261,8 @@ export function RateComparer({
 
   function changeCorridor(id: CorridorId) {
     if (id === corridorId) return;
-    const next = getCorridor(id)!;
+    // Changing only the receiving currency keeps the sender's country.
+    const next = inCountry(getCorridor(id)!, country);
     setCorridorId(id);
     setCountry(next.sendCountry);
     setLoading(true);
@@ -277,11 +284,12 @@ export function RateComparer({
   }
 
   async function share() {
-    const url = window.location.href;
+    // Not the address bar's URL: that leaves out whatever matches this visitor's location.
+    const url = `${window.location.origin}${window.location.pathname}?${shareQuery(link)}`;
     const best = offers[0];
     const text = best
-      ? `Sending ${formatMoney(amount, currency)} to Bangladesh? ${best.provider.name} has the best rate right now: ${formatRate(best.rate)}.`
-      : `Compare ${currency} to BDT money transfer rates.`;
+      ? `Sending ${formatMoney(amount, currency)} to ${destination.countryName}? ${best.provider.name} has the best rate right now: ${formatRate(best.rate)}.`
+      : `Compare ${currency} to ${receiveCurrency} money transfer rates.`;
     // Phones get the native share sheet (WhatsApp etc.); desktops copy the link.
     if (navigator.share && window.matchMedia("(pointer: coarse)").matches) {
       await navigator.share({ title: SITE_NAME, text, url }).catch(() => {});
@@ -352,12 +360,17 @@ export function RateComparer({
             label="You send"
             options={sendCurrencies}
             value={currency}
-            onChange={(code) => changeCorridor(corridorFrom(code)!.id)}
+            onChange={(code) => changeCorridor(findCorridor(code, receiveCurrency)!.id)}
           />
           <span aria-hidden="true" className="text-muted">
             →
           </span>
-          <Select label="They receive" options={RECEIVE_CURRENCIES} value="BDT" />
+          <Select
+            label="They receive"
+            options={receiveCurrencies}
+            value={receiveCurrency}
+            onChange={(code) => changeCorridor(findCorridor(currency, code)!.id)}
+          />
           {corridor.sendCountries.length > 1 && (
             <span className="inline-flex items-center gap-2 text-sm text-muted">
               from
@@ -391,7 +404,7 @@ export function RateComparer({
               />
             </span>
           </label>{" "}
-          to Bangladesh
+          to {destination.countryName}
         </h1>
 
         <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -412,7 +425,7 @@ export function RateComparer({
                       onChange={() => setMethod(m)}
                       className="sr-only"
                     />
-                    {METHOD_LABEL[m]}
+                    {methodLabel(m, receiveCurrency)}
                   </label>
                 ))}
               </div>
@@ -495,8 +508,9 @@ export function RateComparer({
               key={offer.provider.id}
               offer={offer}
               rank={i + 1}
-              isMostTaka={offer.provider.id === mostTakaId}
+              isMostReceived={offer.provider.id === mostReceivedId}
               currency={currency}
+              receiveCurrency={receiveCurrency}
               trend={showTrends ? (trends.get(offer.provider.id) ?? []) : undefined}
             />
           ))}
@@ -508,7 +522,7 @@ export function RateComparer({
             label={
               snapshot
                 ? `Checking ${pendingNew} more ${pendingNew === 1 ? "service" : "services"}…`
-                : `Getting live quotes from ${providerCounts[corridorId]} services…`
+                : `Getting live quotes from ${countFor(corridor)} services…`
             }
           />
         )}
@@ -546,7 +560,7 @@ export function RateComparer({
             )}
             {noMethod.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold">No {METHOD_PAYOUT[activeMethod]}</h3>
+                <h3 className="text-sm font-semibold">No {methodPayout(activeMethod, receiveCurrency)}</h3>
                 <p className="mt-1 text-sm text-muted">These services pay out another way. Pick one to compare it.</p>
                 <ul className="mt-3 flex flex-wrap gap-2">
                   {noMethod.map((p) => {
@@ -555,7 +569,7 @@ export function RateComparer({
                       <li key={p.id}>
                         <button type="button" onClick={() => setMethod(other[0])} className={CHIP}>
                           <ProviderLogo name={p.name} domain={p.domain} size={18} />
-                          {p.name} · {other.map((m) => METHOD_LABEL[m]).join(", ")}
+                          {p.name} · {other.map((m) => methodLabel(m, receiveCurrency)).join(", ")}
                         </button>
                       </li>
                     );
@@ -613,14 +627,16 @@ export function RateComparer({
 function OfferRow({
   offer,
   rank,
-  isMostTaka,
+  isMostReceived,
   currency,
+  receiveCurrency,
   trend,
 }: {
   offer: Offer;
   rank: number;
-  isMostTaka: boolean;
+  isMostReceived: boolean;
   currency: string;
+  receiveCurrency: ReceiveCurrency;
   /** Set when the trend column is shown; may be too short to draw for a provider. */
   trend?: TrendPoint[];
 }) {
@@ -659,11 +675,11 @@ function OfferRow({
           {top && <span className="block text-[11px] font-medium uppercase tracking-[0.18em] opacity-75">Best rate</span>}
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className={`font-semibold ${top ? "text-lg" : ""}`}>{provider.name}</span>
-            {isMostTaka && (
+            {isMostReceived && (
               <span
                 className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${top ? "bg-note-ink/15" : "bg-green-soft text-brand"}`}
               >
-                Most taka after fees
+                Most {DESTINATIONS[receiveCurrency].moneyWord} after fees
               </span>
             )}
             {offer.promo && (
@@ -676,7 +692,7 @@ function OfferRow({
           </span>
           <span className={`line-clamp-2 text-sm ${top ? "opacity-80" : "text-muted"}`}>
             <span className="sm:hidden">
-              {fee} · {formatBdt(offer.receive)}
+              {fee} · {formatReceive(offer.receive, receiveCurrency)}
               {provider.note ? " · " : ""}
             </span>
             {provider.note}
@@ -696,7 +712,7 @@ function OfferRow({
           {quote.feeUnknown ? "Not listed" : offer.fee ? formatMoney(offer.fee, currency) : "None"}
         </span>
         <span className={`figure hidden text-right text-xl sm:block ${top ? "font-semibold" : ""}`}>
-          {formatBdt(offer.receive)}
+          {formatReceive(offer.receive, receiveCurrency)}
         </span>
       </a>
     </li>

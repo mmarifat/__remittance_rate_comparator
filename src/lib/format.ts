@@ -1,7 +1,16 @@
-// Bangladesh groups digits in lakhs and crores (1,63,450), same as the en-IN locale.
-const bdt = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+import type { ReceiveCurrency } from "./corridors";
 
-export const formatBdt = (n: number) => `৳${bdt.format(Math.round(n))}`;
+const RECEIVE_FORMATS: Record<ReceiveCurrency, { symbol: string; digits: Intl.NumberFormat }> = {
+  // Bangladesh groups digits in lakhs and crores (1,63,450), same as the en-IN locale.
+  BDT: { symbol: "৳", digits: new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }) },
+  PKR: { symbol: "Rs ", digits: new Intl.NumberFormat("en-PK", { maximumFractionDigits: 0 }) },
+};
+
+/** What the recipient gets, in whole units: ৳1,63,450 / Rs 373,149. */
+export function formatReceive(n: number, currency: ReceiveCurrency): string {
+  const { symbol, digits } = RECEIVE_FORMATS[currency];
+  return `${symbol}${digits.format(Math.round(n))}`;
+}
 
 // Building an Intl.NumberFormat is slow and these run for every row on every render, so reuse them.
 const moneyFormats = new Map<string, Intl.NumberFormat>();

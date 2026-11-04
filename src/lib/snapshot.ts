@@ -4,15 +4,33 @@ import { providers } from "./providers";
 import type { ProviderDef } from "./providers/types";
 import type { ProviderResult, Quote, RatesSnapshot } from "./types";
 
+/** Upper bound for one provider, including all its tier requests, so a slow site can't hold up the snapshot. */
+const PROVIDER_TIMEOUT_MS = 20_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`No answer within ${ms / 1000}s`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/** Each mid-market source gets this long, so the rate is known (or given up on) within 10 seconds. */
+const MID_MARKET_TIMEOUT_MS = { wise: 6_000, fallback: 4_000 };
+
 async function fetchMidMarket(corridor: Corridor): Promise<number | null> {
   try {
-    const wise = await getJson<{ value: number }>(
-      `https://wise.com/rates/live?source=${corridor.from}&target=${corridor.to}`,
+    const wise = await withTimeout(
+      getJson<{ value: number }>(`https://wise.com/rates/live?source=${corridor.from}&target=${corridor.to}`),
+      MID_MARKET_TIMEOUT_MS.wise,
     );
     return num(wise.value);
   } catch {
     try {
-      const er = await getJson<{ rates: Record<string, number> }>(`https://open.er-api.com/v6/latest/${corridor.from}`);
+      const er = await withTimeout(
+        getJson<{ rates: Record<string, number> }>(`https://open.er-api.com/v6/latest/${corridor.from}`),
+        MID_MARKET_TIMEOUT_MS.fallback,
+      );
       return num(er.rates[corridor.to]);
     } catch {
       return null;
@@ -31,32 +49,33 @@ function isPlausible(quote: Quote, corridor: Corridor, midMarket: number | null)
   return Math.abs(quote.rate / reference - 1) < tolerance;
 }
 
-/** Upper bound for one provider, including all its tier requests, so a slow site can't hold up the snapshot. */
-const PROVIDER_TIMEOUT_MS = 20_000;
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`No answer within ${ms / 1000}s`)), ms);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-}
-
 export function supports(def: ProviderDef, corridor: Corridor): boolean {
   return Boolean(def.urlFor(corridor));
 }
 
-export async function runProvider(def: ProviderDef, corridor: Corridor, midMarket: number | null): Promise<ProviderResult> {
+/**
+ * Asks one provider for its quotes. The mid-market rate, used to check the quotes are plausible, can be
+ * a promise: the provider is asked at the same time, so a slow mid-market source doesn't add to the wait.
+ */
+export async function runProvider(
+  def: ProviderDef,
+  corridor: Corridor,
+  midMarketRate: number | null | Promise<number | null>,
+): Promise<ProviderResult> {
   const url = def.urlFor(corridor) ?? "";
   const base = { id: def.id, name: def.name, url, domain: def.domain };
   try {
-    const fetched = await withTimeout(def.fetchQuotes(corridor), PROVIDER_TIMEOUT_MS);
+    const [fetched, midMarket] = await Promise.all([
+      withTimeout(def.fetchQuotes(corridor), PROVIDER_TIMEOUT_MS),
+      midMarketRate,
+    ]);
     const { quotes: all, note } = Array.isArray(fetched)
       ? { quotes: fetched, note: def.note }
       : { quotes: fetched.quotes, note: fetched.note ?? def.note };
     const quotes = all.filter((q) => isPlausible(q, corridor, midMarket));
     if (quotes.length === 0) {
-      throw new Error(all.length ? "Returned a rate that doesn't look like GBP→BDT" : "No GBP→BDT quote returned");
+      const route = `${corridor.from}→${corridor.to}`;
+      throw new Error(all.length ? `Returned a rate that doesn't look like ${route}` : `No ${route} quote returned`);
     }
     return { ...base, note, status: "ok", quotes };
   } catch (err) {
@@ -82,10 +101,8 @@ export function startCheck(corridor: Corridor): Check {
     corridor,
     updatedAt: new Date().toISOString(),
     midMarket,
-    // Providers need the mid-market rate for the plausibility check; it's the fastest request.
-    results: providers
-      .filter((p) => supports(p, corridor))
-      .map((p) => midMarket.then((mid) => runProvider(p, corridor, mid))),
+    // Every provider is asked straight away; each waits for the mid-market rate only to check its quotes.
+    results: providers.filter((p) => supports(p, corridor)).map((p) => runProvider(p, corridor, midMarket)),
   };
 }
 

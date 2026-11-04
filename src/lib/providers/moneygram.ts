@@ -1,16 +1,20 @@
-import { COUNTRIES } from "../corridors";
+import { COUNTRIES, destinationOf, type Corridor, type CountryCode } from "../corridors";
 import { atTiers, getJson, num } from "./http";
 import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
 
 interface FeeQuote {
-  feeQuotesByCurrency: {
-    BDT?: { fxRate: number; sendFee: number; promo?: { fxRate: number; sendFee: number } };
-  };
+  feeQuotesByCurrency: Record<string, { fxRate: number; sendFee: number; promo?: { fxRate: number; sendFee: number } } | undefined>;
 }
 
-const url = (country: string) => `https://www.moneygram.com/${country.toLowerCase()}/en/corridor/bangladesh`;
-const ROUTES: Routes = { "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url } };
+const url = (country: CountryCode, corridor: Corridor) =>
+  `https://www.moneygram.com/${country.toLowerCase()}/en/corridor/${destinationOf(corridor).slug}`;
+// To Pakistan only from the UK: MoneyGram's own calculator blocks datacenter requests, and Wise's
+// comparison (the fallback) only carries MoneyGram's GBP→PKR price.
+const ROUTES: Routes = {
+  "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url },
+  "GBP-PKR": { url },
+};
 
 export const moneygram: ProviderDef = {
   id: "moneygram",
@@ -25,18 +29,18 @@ export const moneygram: ProviderDef = {
     const quotes = await atTiers(async (amount) => {
       // Without these language headers their bot protection answers 403.
       const res = await getJson<FeeQuote>(
-        `https://www.moneygram.com/api/send-money/fee-quote/v2?senderCountryCode=${country}&senderCurrencyCode=${corridor.from}&receiverCountryCode=BGD&receiverCurrencyCode=${corridor.to}&sendAmount=${amount.toFixed(2)}`,
+        `https://www.moneygram.com/api/send-money/fee-quote/v2?senderCountryCode=${country}&senderCurrencyCode=${corridor.from}&receiverCountryCode=${destinationOf(corridor).iso3}&receiverCurrencyCode=${corridor.to}&sendAmount=${amount.toFixed(2)}`,
         { headers: { "Accept-Language": "en-gb", "locale-header": "en-gb" } },
       );
-      const bdt = res.feeQuotesByCurrency.BDT;
-      if (!bdt) throw new Error("No BDT quote");
-      promo ??= bdt.promo;
+      const quote = res.feeQuotesByCurrency[corridor.to];
+      if (!quote) throw new Error(`No ${corridor.to} quote`);
+      promo ??= quote.promo;
       return {
         sendAmount: amount,
-        rate: num(bdt.fxRate),
-        fee: num(bdt.sendFee),
+        rate: num(quote.fxRate),
+        fee: num(quote.sendFee),
         method: "bank",
-        promo: bdt.promo ? { rate: num(bdt.promo.fxRate), fee: num(bdt.promo.sendFee) } : undefined,
+        promo: quote.promo ? { rate: num(quote.promo.fxRate), fee: num(quote.promo.sendFee) } : undefined,
       };
     }, [100, 1000]);
     const note = promo

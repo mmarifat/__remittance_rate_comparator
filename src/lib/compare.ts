@@ -9,9 +9,9 @@ export interface Offer {
   fee: number;
   /** True when a new-customer deal is included in `rate` and `fee`. */
   promo: boolean;
-  /** BDT the recipient gets when the sender pays `amount` in total, fees included. */
+  /** What the recipient gets, in the receiving currency, when the sender pays `amount` in total, fees included. */
   receive: number;
-  /** BDT received per unit of the sending currency paid, fees included. */
+  /** Receiving currency delivered per unit of the sending currency paid, fees included. */
   effectiveRate: number;
 }
 
@@ -70,10 +70,10 @@ export function buildOffers(
 }
 
 /**
- * The offer that delivers the most taka once fees are taken out, which isn't always the best rate.
+ * The offer that delivers the most money once fees are taken out, which isn't always the best rate.
  * Offers with an unpublished fee can't be judged on this, so they're left out.
  */
-export function mostTaka(offers: Offer[]): Offer | undefined {
+export function mostReceived(offers: Offer[]): Offer | undefined {
   return offers
     .filter((o) => !o.quote.feeUnknown)
     .reduce<Offer | undefined>((best, o) => (!best || o.receive > best.receive ? o : best), undefined);

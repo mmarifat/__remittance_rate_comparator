@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { availableMethods, buildOffers, mostTaka, pickQuote } from "./compare";
+import { availableMethods, buildOffers, mostReceived, pickQuote } from "./compare";
 import type { ProviderResult, Quote, RatesSnapshot } from "./types";
 
 const q = (sendAmount: number, rate: number, fee = 0, method: Quote["method"] = "bank"): Quote => ({
@@ -58,7 +58,7 @@ describe("buildOffers", () => {
     expect(offers[0].receive).toBe(15675);
     expect(offers[0].effectiveRate).toBe(156.75);
     // ...but the fee means the lower rate actually delivers more taka.
-    expect(mostTaka(offers)?.provider.id).toBe("lower-rate-no-fee");
+    expect(mostReceived(offers)?.provider.id).toBe("lower-rate-no-fee");
   });
 
   it("never calls an offer with an unpublished fee the one with most taka", () => {
@@ -71,7 +71,7 @@ describe("buildOffers", () => {
       "bank",
     );
     expect(offers[0].provider.id).toBe("fee-unknown");
-    expect(mostTaka(offers)?.provider.id).toBe("known");
+    expect(mostReceived(offers)?.provider.id).toBe("known");
   });
 
   it("ignores new-customer deals unless asked", () => {

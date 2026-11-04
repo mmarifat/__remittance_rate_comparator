@@ -1,24 +1,12 @@
 import type { NextRequest } from "next/server";
-import { DEFAULT_CORRIDOR, getCorridor, inCountry, type Corridor } from "@/lib/corridors";
-import { startCheck, toSnapshot, type Check } from "@/lib/snapshot";
+import { DEFAULT_CORRIDOR, getCorridor, inCountry } from "@/lib/corridors";
+import { CACHE_SECONDS, sharedCheck } from "@/lib/liveCheck";
+import { toSnapshot } from "@/lib/snapshot";
 import type { RatesEvent } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-
-/** Providers are queried at most once per this many seconds per corridor and country; everyone in between shares the result. */
-const CACHE_SECONDS = 120;
-
-// Per server instance, corridor and sending country: concurrent and back-to-back requests share one provider check.
-const latest = new Map<string, { at: number; check: Check }>();
-
-function sharedCheck(corridor: Corridor): Check {
-  const key = `${corridor.id}:${corridor.sendCountry}`;
-  const hit = latest.get(key);
-  if (hit && Date.now() - hit.at <= CACHE_SECONDS * 1000) return hit.check;
-  const check = startCheck(corridor);
-  latest.set(key, { at: Date.now(), check });
-  return check;
-}
+// The same limit as the API's live routes, so a host can serve them all from one function. A check takes about 20 seconds at most.
+export const maxDuration = 60;
 
 // Vercel's CDN serves one response per URL to every visitor for CACHE_SECONDS, then keeps serving
 // it for up to a minute more while it fetches a fresh one in the background.
@@ -35,7 +23,7 @@ export async function GET(request: NextRequest) {
   const base = getCorridor(params.get("corridor") ?? DEFAULT_CORRIDOR);
   if (!base) return Response.json({ error: "Unknown corridor" }, { status: 400 });
   const corridor = inCountry(base, params.get("country"));
-  const check = sharedCheck(corridor);
+  const check = await sharedCheck(corridor);
 
   if (!params.has("stream")) {
     return Response.json(await toSnapshot(check), { headers: { "Cache-Control": CACHE_CONTROL } });

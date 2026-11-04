@@ -1,3 +1,4 @@
+import { destinationOf } from "../corridors";
 import { atTiers, num, postJson } from "./http";
 import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
@@ -12,7 +13,10 @@ interface XeQuote {
 const METHODS: Record<string, DeliveryMethod> = { BankAccount: "bank", MobileWallet: "wallet", CashPayout: "cash" };
 
 const URL = "https://www.xe.com/send-money/";
-const ROUTES: Routes = { "GBP-BDT": { url: URL }, "EUR-BDT": { url: URL }, "USD-BDT": { url: URL }, "CAD-BDT": { url: URL } };
+const ROUTES: Routes = {
+  "GBP-BDT": { url: URL }, "EUR-BDT": { url: URL }, "USD-BDT": { url: URL }, "CAD-BDT": { url: URL },
+  "GBP-PKR": { url: URL }, "EUR-PKR": { url: URL }, "USD-PKR": { url: URL }, "CAD-PKR": { url: URL },
+};
 
 export const xe: ProviderDef = {
   id: "xe",
@@ -28,7 +32,7 @@ export const xe: ProviderDef = {
         userCountry: corridor.sendCountry,
         amount,
         fixedCcy: corridor.from,
-        countryTo: "BD",
+        countryTo: destinationOf(corridor).country,
       });
       // One entry per way of paying × delivery method, and card payments cost more, so keep the
       // cheapest per delivery method.

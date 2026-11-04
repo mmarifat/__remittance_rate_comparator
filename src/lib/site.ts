@@ -1,7 +1,7 @@
 export const SITE_NAME = "Remittance Rate Comparator";
 
 export const SITE_DESCRIPTION =
-  "Compare live money transfer rates to Bangladesh from the UK, eurozone, US and Canada, best rate first: Remitly, Wise, Taptap Send, Western Union, XE, Ria, SonaliPay and more.";
+  "Compare live money transfer rates to Bangladesh and Pakistan from the UK, eurozone, US and Canada, best rate first: Remitly, Wise, Taptap Send, LemFi, Western Union, Ria and more.";
 
 /** Canonical origin. Vercel sets VERCEL_PROJECT_PRODUCTION_URL; NEXT_PUBLIC_SITE_URL overrides it for a custom domain. */
 export const SITE_URL =

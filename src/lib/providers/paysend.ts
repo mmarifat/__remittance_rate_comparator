@@ -1,3 +1,4 @@
+import { destinationOf, type Corridor, type CountryCode } from "../corridors";
 import { atTiers, getJson, num } from "./http";
 import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
@@ -18,9 +19,12 @@ const SLUGS: Record<string, string> = {
   US: "the-united-states-of-america",
   CA: "canada",
 };
-const url = (country: string) =>
-  `https://paysend.com/${country === "GB" ? "en-gb" : "en-us"}/send-money/from-${SLUGS[country]}-to-bangladesh`;
-const ROUTES: Routes = { "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url } };
+const url = (country: CountryCode, corridor: Corridor) =>
+  `https://paysend.com/${country === "GB" ? "en-gb" : "en-us"}/send-money/from-${SLUGS[country]}-to-${destinationOf(corridor).slug}`;
+const ROUTES: Routes = {
+  "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url },
+  "GBP-PKR": { url }, "EUR-PKR": { url }, "USD-PKR": { url }, "CAD-PKR": { url },
+};
 
 export const paysend: ProviderDef = {
   id: "paysend",
@@ -31,9 +35,10 @@ export const paysend: ProviderDef = {
     routeFor(ROUTES, corridor);
     const country = corridor.sendCountry.toLowerCase();
     const currency = corridor.from.toLowerCase();
+    const target = destinationOf(corridor).country.toLowerCase();
     return atTiers(async (amount) => {
       const res = await getJson<Calculator>(
-        `https://paysend.com/api/calculator?lang=en&country=${country}&operation=send&amount=${amount}&sourceCountry=${country}&targetCountry=bd&sourceCurrency=${currency}&targetCurrency=bdt`,
+        `https://paysend.com/api/calculator?lang=en&country=${country}&operation=send&amount=${amount}&sourceCountry=${country}&targetCountry=${target}&sourceCurrency=${currency}&targetCurrency=${corridor.to.toLowerCase()}`,
       );
       const t = res.calculator.transaction;
       return { sendAmount: amount, rate: num(t.conversionRate), fee: num(t.commissionAmount), method: "bank" };

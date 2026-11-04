@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { currencySymbol, formatAgo, formatBdt, formatMoney } from "./format";
+import { currencySymbol, formatAgo, formatMoney, formatReceive } from "./format";
 
 describe("format", () => {
   it("groups taka in lakhs", () => {
-    expect(formatBdt(163450.4)).toBe("৳1,63,450");
-    expect(formatBdt(12345678)).toBe("৳1,23,45,678");
+    expect(formatReceive(163450.4, "BDT")).toBe("৳1,63,450");
+    expect(formatReceive(12345678, "BDT")).toBe("৳1,23,45,678");
+  });
+
+  it("formats rupees for Pakistan", () => {
+    expect(formatReceive(373149.2, "PKR")).toBe("Rs 373,149");
   });
 
   it("formats the sending currency, dropping pence on whole amounts only", () => {

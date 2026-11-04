@@ -1,8 +1,8 @@
 import type { Corridor, CorridorId, CountryCode } from "../corridors";
 
 interface RouteBase {
-  /** The page users start a transfer on; a function when it differs by sending country. */
-  url: string | ((sendCountry: CountryCode) => string);
+  /** The page users start a transfer on; a function when it differs by sending country or destination. */
+  url: string | ((sendCountry: CountryCode, corridor: Corridor) => string);
   /** For corridors with several sending countries (euros): the only ones this provider serves. */
   countries?: readonly CountryCode[];
 }
@@ -25,7 +25,7 @@ export function urlsFrom(routes: Routes): (corridor: Corridor) => string | undef
   return (corridor) => {
     const route = lookup(routes, corridor);
     if (!route) return undefined;
-    return typeof route.url === "function" ? route.url(corridor.sendCountry) : route.url;
+    return typeof route.url === "function" ? route.url(corridor.sendCountry, corridor) : route.url;
   };
 }
 

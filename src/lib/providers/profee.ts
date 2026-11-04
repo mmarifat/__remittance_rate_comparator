@@ -1,4 +1,4 @@
-import { COUNTRIES, type CountryCode } from "../corridors";
+import { COUNTRIES, destinationOf, type Corridor, type CountryCode } from "../corridors";
 import { atTiers, getJson, num, postJson } from "./http";
 import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
@@ -12,9 +12,12 @@ interface Calculation {
 }
 
 // Profee doesn't serve US senders.
-const url = (country: CountryCode) =>
-  `https://www.profee.com/send-money/from-${COUNTRIES[country].name.toLowerCase().replace(/ /g, "-")}-to-bangladesh`;
-const ROUTES: Routes = { "GBP-BDT": { url }, "EUR-BDT": { url }, "CAD-BDT": { url } };
+const url = (country: CountryCode, corridor: Corridor) =>
+  `https://www.profee.com/send-money/from-${COUNTRIES[country].name.toLowerCase().replace(/ /g, "-")}-to-${destinationOf(corridor).slug}`;
+const ROUTES: Routes = {
+  "GBP-BDT": { url }, "EUR-BDT": { url }, "CAD-BDT": { url },
+  "GBP-PKR": { url }, "EUR-PKR": { url }, "CAD-PKR": { url },
+};
 
 export const profee: ProviderDef = {
   id: "profee",
@@ -24,7 +27,8 @@ export const profee: ProviderDef = {
   async fetchQuotes(corridor) {
     routeFor(ROUTES, corridor);
     // Profee wants a lowercase corridor slug and ISO 3166 numeric country codes.
-    const slug = `${corridor.sendCountry.toLowerCase()}-bd`;
+    const destination = destinationOf(corridor);
+    const slug = `${corridor.sendCountry.toLowerCase()}-${destination.country.toLowerCase()}`;
     const country = COUNTRIES[corridor.sendCountry].numeric;
     const methods = await getJson<Methods>(`https://www.profee.com/api/corridors/${slug}/methods`);
     const bank = methods.body.find((m) => m.isAvailable && m.recipient.account === "WBANK");
@@ -35,7 +39,7 @@ export const profee: ProviderDef = {
       const res = await postJson<Calculation>("https://terminal.profee.com/api/v2/transfer/terminal/calculation", {
         methodId: bank.methodId,
         from: { currency: corridor.from, amount, country },
-        to: { currency: corridor.to, amount: null, country: 50 },
+        to: { currency: corridor.to, amount: null, country: destination.numeric },
         skipLimitValidation: false,
       });
       promoFee ||= res.body.feeSum.type === "PROMO";

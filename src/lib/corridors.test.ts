@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { getCorridor, inCountry } from "./corridors";
+import { destinationOf, findCorridor, getCorridor, inCountry } from "./corridors";
 import { routeFor, urlsFrom, type Routes } from "./providers/routes";
 
 const eur = getCorridor("EUR-BDT")!;
+
+describe("corridors", () => {
+  it("are found by their two currencies", () => {
+    expect(findCorridor("gbp", "pkr")?.id).toBe("GBP-PKR");
+    expect(findCorridor("EUR", "BDT")?.id).toBe("EUR-BDT");
+    expect(findCorridor("JPY", "PKR")).toBeUndefined();
+  });
+
+  it("know where their money lands", () => {
+    expect(destinationOf(getCorridor("USD-PKR")!).iso3).toBe("PAK");
+    expect(destinationOf(eur).slug).toBe("bangladesh");
+  });
+});
 
 describe("inCountry", () => {
   it("switches to a supported sending country and ignores anything else", () => {

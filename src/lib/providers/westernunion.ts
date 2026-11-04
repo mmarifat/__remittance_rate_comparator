@@ -1,3 +1,4 @@
+import { destinationOf, type Corridor, type CountryCode } from "../corridors";
 import { atTiers, num, postJson } from "./http";
 import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
@@ -10,8 +11,12 @@ interface Catalog {
 
 const SERVICES: Record<string, DeliveryMethod> = { "500": "bank", "800": "wallet", "000": "cash" };
 
-const url = (country: string) => `https://www.westernunion.com/${country.toLowerCase()}/en/send-money-to-bangladesh.html`;
-const ROUTES: Routes = { "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url } };
+const url = (country: CountryCode, corridor: Corridor) =>
+  `https://www.westernunion.com/${country.toLowerCase()}/en/send-money-to-${destinationOf(corridor).slug}.html`;
+const ROUTES: Routes = {
+  "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url },
+  "GBP-PKR": { url }, "EUR-PKR": { url }, "USD-PKR": { url }, "CAD-PKR": { url },
+};
 
 export const westernunion: ProviderDef = {
   id: "western-union",
@@ -20,6 +25,7 @@ export const westernunion: ProviderDef = {
   domain: "westernunion.com",
   fetchQuotes: (corridor) => {
     routeFor(ROUTES, corridor);
+    const { country } = destinationOf(corridor);
     return atTiers(async (amount) => {
       const res = await postJson<Catalog>("https://www.westernunion.com/wuconnect/prices/catalog", {
         header_request: { version: "0.5", request_type: "PRICECATALOG" },
@@ -31,7 +37,7 @@ export const westernunion: ProviderDef = {
           cty_iso2_ext: corridor.sendCountry,
           send_amount: String(amount),
         },
-        receiver: { curr_iso3: corridor.to, cty_iso2_ext: "BD", cty_iso2: "BD" },
+        receiver: { curr_iso3: corridor.to, cty_iso2_ext: country, cty_iso2: country },
       });
       if (res.response_status && res.response_status.code !== "P0000") {
         throw new Error(`Western Union status ${res.response_status.code}`);

@@ -2,7 +2,7 @@
   "name": "remittance-rate-comparator",
   "version": "0.1.0",
   "private": true,
-  "description": "Remittance Rate Comparator: live GBP to BDT money transfer rates from 21 providers, best rate first.",
+  "description": "Remittance Rate Comparator: live money transfer rates to Bangladesh and Pakistan from the UK, eurozone, US and Canada, best rate first, plus a rates API.",
   "author": "Md Minhaz Ahamed Rifat <mma.rifat66@gmail.com> (https://github.com/mmarifat)",
   "homepage": "https://remittance-rate-comparator.vercel.app",
   "license": "MIT",
@@ -17,19 +17,28 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "check:providers": "bun scripts/check-providers.ts"
+    "check:providers": "bun scripts/check-providers.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun scripts/db-migrate.ts",
+    "admin": "bun scripts/admin.ts"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
+    "@vercel/functions": "3.10.1",
+    "drizzle-orm": "0.45.4",
     "next": "16.3.6",
+    "pg": "8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.10",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "tailwindcss": "^4",

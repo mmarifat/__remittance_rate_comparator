@@ -1,4 +1,4 @@
-import type { Corridor } from "../corridors";
+import { destinationOf, type Corridor } from "../corridors";
 import { getJson, num } from "./http";
 import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
@@ -21,9 +21,12 @@ async function feedRate(providerName: string, corridor: Corridor): Promise<numbe
   return num(row.rate);
 }
 
-// NALA's feed has GBP, USD and EUR rates to Bangladesh, but not CAD.
-const URL = "https://www.nala.com/country/bangladesh";
-const ROUTES: Routes = { "GBP-BDT": { url: URL }, "EUR-BDT": { url: URL }, "USD-BDT": { url: URL } };
+// NALA's feed has GBP, USD and EUR rates to Bangladesh and Pakistan, but not CAD.
+const url = (_country: string, corridor: Corridor) => `https://www.nala.com/country/${destinationOf(corridor).slug}`;
+const ROUTES: Routes = {
+  "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url },
+  "GBP-PKR": { url }, "EUR-PKR": { url }, "USD-PKR": { url },
+};
 
 export const nala: ProviderDef = {
   id: "nala",

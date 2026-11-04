@@ -68,7 +68,8 @@ export function providerHealth(
   const recent = records.slice(-downAfter);
   const latest = records.at(-1);
   return {
-    down: recent.length < downAfter ? [] : ids.filter((id) => recent.every((r) => r.r[id] == null)),
+    // A provider added recently has no entry in older checks; those don't count as failures.
+    down: recent.length < downAfter ? [] : ids.filter((id) => recent.every((r) => id in r.r && r.r[id] == null)),
     up: latest ? ids.filter((id) => latest.r[id] != null) : [],
   };
 }
@@ -91,4 +92,45 @@ export function bestRateTrend(records: HistoryRecord[], now: number, days = 7): 
     const rates = Object.values(r.r).filter((v): v is number => v != null);
     return t >= since && rates.length ? [{ t, rate: Math.max(...rates) }] : [];
   });
+}
+
+export interface DailyPoint {
+  /** UTC day, "YYYY-MM-DD". */
+  day: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  samples: number;
+}
+
+/**
+ * Open, high, low and close per UTC day for each provider (and mid-market), from hourly records sorted
+ * oldest first. A provider's checks it didn't answer are skipped.
+ */
+export function dailySummary(records: HistoryRecord[]): { providers: Map<string, DailyPoint[]>; midMarket: DailyPoint[] } {
+  const add = (series: DailyPoint[], day: string, rate: number) => {
+    const last = series.at(-1);
+    if (last?.day === day) {
+      last.high = Math.max(last.high, rate);
+      last.low = Math.min(last.low, rate);
+      last.close = rate;
+      last.samples++;
+    } else {
+      series.push({ day, open: rate, high: rate, low: rate, close: rate, samples: 1 });
+    }
+  };
+  const providers = new Map<string, DailyPoint[]>();
+  const midMarket: DailyPoint[] = [];
+  for (const record of records) {
+    const day = record.t.slice(0, 10);
+    if (record.mid != null) add(midMarket, day, record.mid);
+    for (const [id, rate] of Object.entries(record.r)) {
+      if (rate == null) continue;
+      const series = providers.get(id) ?? [];
+      add(series, day, rate);
+      providers.set(id, series);
+    }
+  }
+  return { providers, midMarket };
 }

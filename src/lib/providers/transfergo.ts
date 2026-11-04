@@ -1,3 +1,4 @@
+import { destinationOf, type Corridor } from "../corridors";
 import { atTiers, getJson, num } from "./http";
 import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
@@ -12,10 +13,9 @@ interface TransferGoQuotes {
 }
 
 // TransferGo sends from the UK and Europe; it doesn't offer US or Canadian senders.
-const ROUTES: Routes = {
-  "GBP-BDT": { url: "https://www.transfergo.com/send-money-to-bangladesh" },
-  "EUR-BDT": { url: "https://www.transfergo.com/send-money-to-bangladesh" },
-};
+const url = (_country: string, corridor: Corridor) =>
+  `https://www.transfergo.com/send-money-to-${destinationOf(corridor).slug}`;
+const ROUTES: Routes = { "GBP-BDT": { url }, "EUR-BDT": { url }, "GBP-PKR": { url }, "EUR-PKR": { url } };
 
 export const transfergo: ProviderDef = {
   id: "transfergo",
@@ -27,7 +27,7 @@ export const transfergo: ProviderDef = {
     routeFor(ROUTES, corridor);
     return atTiers(async (amount) => {
       const res = await getJson<TransferGoQuotes>(
-        `https://my.transfergo.com/api/booking/quotes?fromCurrencyCode=${corridor.from}&toCurrencyCode=${corridor.to}&fromCountryCode=${corridor.sendCountry}&toCountryCode=BD&amount=${amount}&calculationBase=sendAmount&business=0`,
+        `https://my.transfergo.com/api/booking/quotes?fromCurrencyCode=${corridor.from}&toCurrencyCode=${corridor.to}&fromCountryCode=${corridor.sendCountry}&toCountryCode=${destinationOf(corridor).country}&amount=${amount}&calculationBase=sendAmount&business=0`,
       );
       return res.options.map((o) => ({
         sendAmount: amount,

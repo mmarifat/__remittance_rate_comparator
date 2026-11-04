@@ -4,7 +4,7 @@ export type DeliveryMethod = "bank" | "wallet" | "cash";
 export interface Quote {
   /** Amount, in the sending currency, the quote was requested for. */
   sendAmount: number;
-  /** BDT the recipient gets per unit of the sending currency. */
+  /** Receiving currency (e.g. BDT or PKR) the recipient gets per unit of the sending currency. */
   rate: number;
   /** Fee, in the sending currency, for sending `sendAmount`. */
   fee: number;

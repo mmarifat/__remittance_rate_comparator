@@ -1,3 +1,4 @@
+import { destinationOf, type Corridor, type CountryCode } from "../corridors";
 import { atTiers, getJson, num } from "./http";
 import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
@@ -19,11 +20,15 @@ interface Computed {
   };
 }
 
-// Instarem has a local Bangladesh page for some countries; the rest share its international one.
+// Instarem has local pages for some countries; the rest share its international one.
 const LOCAL_PAGES = new Set(["GB", "US", "CA", "DE", "FR", "IE"]);
-const url = (country: string) =>
-  `https://www.instarem.com/${LOCAL_PAGES.has(country) ? `en-${country.toLowerCase()}` : "en"}/send-money-to-bangladesh/`;
-const ROUTES: Routes = { "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url } };
+const url = (country: CountryCode, corridor: Corridor) =>
+  `https://www.instarem.com/${LOCAL_PAGES.has(country) ? `en-${country.toLowerCase()}` : "en"}/send-money-to-${destinationOf(corridor).slug}/`;
+// Not offered from Canada to Pakistan.
+const ROUTES: Routes = {
+  "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url },
+  "GBP-PKR": { url }, "EUR-PKR": { url }, "USD-PKR": { url },
+};
 
 export const instarem: ProviderDef = {
   id: "instarem",

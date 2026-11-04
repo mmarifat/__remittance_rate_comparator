@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   appendRecord,
   bestRateTrend,
+  dailySummary,
   headlineRate,
   providerHealth,
   providerTrend,
@@ -69,6 +70,23 @@ describe("serializeHistory", () => {
   });
 });
 
+describe("dailySummary", () => {
+  it("rolls hourly records up into open, high, low and close per UTC day", () => {
+    const { providers, midMarket } = dailySummary([
+      rec("2026-11-03T08:00:00Z", { a: 370, b: null }),
+      rec("2026-11-03T12:00:00Z", { a: 374, b: 160 }),
+      rec("2026-11-03T20:00:00Z", { a: 372, b: null }),
+      rec("2026-11-04T08:00:00Z", { a: 375, b: 161 }),
+    ]);
+    expect(providers.get("a")).toEqual([
+      { day: "2026-11-03", open: 370, high: 374, low: 370, close: 372, samples: 3 },
+      { day: "2026-11-04", open: 375, high: 375, low: 375, close: 375, samples: 1 },
+    ]);
+    expect(providers.get("b")?.map((p) => p.samples)).toEqual([1, 1]);
+    expect(midMarket).toHaveLength(2);
+  });
+});
+
 describe("providerHealth", () => {
   const hours = (n: number, r: HistoryRecord["r"]) =>
     Array.from({ length: n }, (_, i) => rec(`2026-09-26T${String(i).padStart(2, "0")}:00:00Z`, r));
@@ -76,6 +94,11 @@ describe("providerHealth", () => {
   it("flags a provider only after it fails every one of the last checks", () => {
     const records = [...hours(5, { a: null, b: 162 }), rec("2026-09-26T06:00:00Z", { a: null, b: null })];
     expect(providerHealth(records, ["a", "b"])).toEqual({ down: ["a"], up: [] });
+  });
+
+  it("doesn't count checks from before a provider was added", () => {
+    const records = [...hours(5, { b: 162 }), rec("2026-09-26T06:00:00Z", { a: null, b: 162 })];
+    expect(providerHealth(records, ["a", "b"]).down).toEqual([]);
   });
 
   it("needs enough checks before calling anything down", () => {

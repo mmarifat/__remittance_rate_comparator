@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { homeFor, linkQuery, parseLink, type LinkState } from "./link";
+import { homeFor, linkQuery, parseLink, shareQuery, type LinkState } from "./link";
 
 describe("homeFor", () => {
   it("starts visitors on their own currency and country", () => {
@@ -8,6 +8,7 @@ describe("homeFor", () => {
     expect(homeFor("ES")).toEqual({ corridorId: "EUR-BDT", country: "ES" });
     expect(homeFor("US")).toEqual({ corridorId: "USD-BDT", country: "US" });
     expect(homeFor("CA")).toEqual({ corridorId: "CAD-BDT", country: "CA" });
+    expect(homeFor("PK")).toEqual({ corridorId: "GBP-PKR", country: "GB" });
   });
 
   it("gives other eurozone visitors euro prices from Italy, and everyone else GBP", () => {
@@ -41,6 +42,12 @@ describe("parseLink", () => {
     expect(parseLink({ from: "EUR", country: "DE" }, homeFor("GB"))).toMatchObject({ corridorId: "EUR-BDT", country: "DE" });
   });
 
+  it("reads the receiving currency, keeping the visitor's own sending side", () => {
+    expect(parseLink({ to: "pkr" }, spain)).toMatchObject({ corridorId: "EUR-PKR", country: "ES" });
+    expect(parseLink({ from: "USD", to: "PKR" }, spain)).toMatchObject({ corridorId: "USD-PKR", country: "US" });
+    expect(parseLink({ to: "XYZ" }, spain)).toMatchObject({ corridorId: "EUR-BDT", country: "ES" });
+  });
+
   it("ignores values it can't use", () => {
     expect(parseLink({ from: "XYZ", country: "US", amount: "abc", method: "pigeon" }, spain)).toMatchObject({
       corridorId: "EUR-BDT",
@@ -62,6 +69,24 @@ describe("linkQuery", () => {
 
   it("writes out a currency that differs from home, so a reload keeps it", () => {
     expect(linkQuery(state({ corridorId: "GBP-BDT", country: "GB" }), italy)).toBe("from=GBP");
+  });
+
+  it("writes out a receiving currency that differs from home", () => {
+    expect(linkQuery(state({ corridorId: "EUR-PKR", country: "IT" }), italy)).toBe("to=PKR");
+    expect(linkQuery(state({ corridorId: "GBP-PKR", country: "GB" }), italy)).toBe("from=GBP&to=PKR");
+  });
+
+  it("makes shared links that open the same comparison wherever the recipient is", () => {
+    const fromPakistan = { ...parseLink({}, homeFor("PK")), amount: "500" };
+    const fromItaly = parseLink({}, italy);
+    for (const [state, opener] of [
+      [fromPakistan, homeFor("GB")],
+      [fromItaly, homeFor("ES")],
+      [fromItaly, homeFor("PK")],
+    ] as const) {
+      expect(parseLink(Object.fromEntries(new URLSearchParams(shareQuery(state))), opener)).toEqual(state);
+    }
+    expect(shareQuery(fromPakistan)).toBe("from=GBP&to=PKR&country=GB&amount=500");
   });
 
   it("round-trips through parseLink", () => {

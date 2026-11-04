@@ -1,3 +1,4 @@
+import { destinationOf, type Corridor, type CountryCode } from "../corridors";
 import { num, postJson, request } from "./http";
 import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
@@ -6,8 +7,12 @@ import type { DeliveryMethod, Quote } from "../types";
 const BASE = "https://public.riamoneytransfer.com";
 const AMOUNT = 1000;
 
-const url = (country: string) => `https://www.riamoneytransfer.com/en-${country.toLowerCase()}/send-money-to-bangladesh/`;
-const ROUTES: Routes = { "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url } };
+const url = (country: CountryCode, corridor: Corridor) =>
+  `https://www.riamoneytransfer.com/en-${country.toLowerCase()}/send-money-to-${destinationOf(corridor).slug}/`;
+const ROUTES: Routes = {
+  "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url },
+  "GBP-PKR": { url }, "EUR-PKR": { url }, "USD-PKR": { url }, "CAD-PKR": { url },
+};
 
 const METHODS: [string, DeliveryMethod][] = [
   ["BankDeposit", "bank"],
@@ -42,7 +47,7 @@ export const ria: ProviderDef = {
           {
             selections: {
               countryFrom: corridor.sendCountry,
-              countryTo: "BD",
+              countryTo: destinationOf(corridor).country,
               amountFrom: AMOUNT,
               currencyFrom: corridor.from,
               currencyTo: corridor.to,

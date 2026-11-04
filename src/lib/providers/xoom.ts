@@ -1,3 +1,4 @@
+import { destinationOf, type Corridor } from "../corridors";
 import { num, postJson, request } from "./http";
 import { routeFor, urlsFrom, type Routes } from "./routes";
 import type { ProviderDef } from "./types";
@@ -17,8 +18,11 @@ interface Remittance {
 const METHODS: Record<string, DeliveryMethod> = { DEPOSIT: "bank", MOBILE_WALLET: "wallet", PICKUP: "cash" };
 const AMOUNT = 1000;
 
-const URL = "https://www.xoom.com/bangladesh/send-money";
-const ROUTES: Routes = { "GBP-BDT": { url: URL }, "EUR-BDT": { url: URL }, "USD-BDT": { url: URL }, "CAD-BDT": { url: URL } };
+const url = (_country: string, corridor: Corridor) => `https://www.xoom.com/${destinationOf(corridor).slug}/send-money`;
+const ROUTES: Routes = {
+  "GBP-BDT": { url }, "EUR-BDT": { url }, "USD-BDT": { url }, "CAD-BDT": { url },
+  "GBP-PKR": { url }, "EUR-PKR": { url }, "USD-PKR": { url }, "CAD-PKR": { url },
+};
 
 export const xoom: ProviderDef = {
   id: "xoom",
@@ -28,7 +32,7 @@ export const xoom: ProviderDef = {
   async fetchQuotes(corridor) {
     routeFor(ROUTES, corridor);
     // The quote API needs the guest CSRF and session cookies that the public page sets.
-    const page = await request("https://www.xoom.com/bangladesh/send-money");
+    const page = await request(url("", corridor));
     const cookies = page.headers
       .getSetCookie()
       .map((c) => c.split(";")[0])
@@ -40,7 +44,7 @@ export const xoom: ProviderDef = {
       {
         variables: {
           sourceCurrency: corridor.from,
-          destinationCountry: "BD",
+          destinationCountry: destinationOf(corridor).country,
           destinationCurrency: corridor.to,
           amount: String(AMOUNT),
           target: "SEND_AMOUNT",
