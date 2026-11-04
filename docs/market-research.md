@@ -815,9 +815,9 @@ Checked against vendor documentation on 2026-11-04:
   - The database sleeps after 5 idle minutes and wakes in a few hundred milliseconds.
   - At the compute limit it is suspended until the next month, which would mean an API outage.
 - **Free-tier usage for this project:**
-  - The database holds only customers, keys and usage counters, a few megabytes. Rates are checked live when asked, through the same two-minute cache as the comparison page, and history comes from the repository's `data` branch, so nothing grows with rates.
+  - The database holds only customers, keys and usage counters, a few megabytes. Rates are checked live when asked, through the same two-minute cache as the comparison page, and never stored, so nothing grows with rates.
   - The comparison page doesn't touch the database, and nothing runs on a schedule. Only API traffic wakes it. A request at least every 5 minutes, all month, would keep it awake and use up the 100 compute-hours before the month ends.
-- **Vercel's Hobby plan is for non-commercial, personal use only.** A paid API, or paid developers working on the code, needs Vercel Pro ($20 a month). Hobby cron jobs run once a day at most; the API needs none, and the hourly history job runs from GitHub Actions.
+- **Vercel's Hobby plan is for non-commercial, personal use only.** A paid API, or paid developers working on the code, needs Vercel Pro ($20 a month). Hobby cron jobs run once a day at most; nothing here needs one.
 - **Recommendation:**
   - Use Neon Free in London (`aws-eu-west-2`, next to `lhr1`) while the API is unpaid.
   - Move to Vercel Pro and Neon's paid plan (pay per use, roughly $3 to $20 a month) before the first paying customer.

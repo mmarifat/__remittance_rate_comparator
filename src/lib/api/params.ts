@@ -1,5 +1,4 @@
 import { CORRIDORS, findCorridor, getCorridor, type Corridor, type CountryCode } from "../corridors";
-import { parseIsoDate } from "../isoDate";
 import { MAX_AMOUNT } from "../link";
 import type { DeliveryMethod } from "../types";
 import { ApiError } from "./http";
@@ -51,23 +50,4 @@ export function booleanParam(params: URLSearchParams, name: string): boolean {
   if (raw === null || raw === "" || raw === "false" || raw === "0") return false;
   if (raw === "true" || raw === "1") return true;
   throw new ApiError(400, `invalid_${name.toLowerCase()}`, `${name} must be true or false.`);
-}
-
-/**
- * An ISO 8601 date, or date and time with `Z` or an offset. A date alone means the start of that UTC
- * day, or with `endOfDay` (for the end of a range) its last moment, so `until=2026-11-03` includes the 3rd.
- */
-export function dateParam(params: URLSearchParams, name: string, { endOfDay = false } = {}): Date | undefined {
-  // An unencoded "+" in an offset arrives as a space (query strings decode "+" that way); put it back.
-  const raw = params.get(name)?.trim().replace(/(T[\d:.]+) (\d{2}:\d{2})$/i, "$1+$2");
-  if (!raw) return undefined;
-  const parsed = parseIsoDate(raw);
-  if (!parsed) {
-    throw new ApiError(
-      400,
-      `invalid_${name}`,
-      `${name} must be an ISO 8601 date (2026-11-01) or a date and time with Z or an offset (2026-11-01T09:00:00Z).`,
-    );
-  }
-  return endOfDay && parsed.dateOnly ? new Date(parsed.date.getTime() + 86_400_000 - 1) : parsed.date;
 }

@@ -13,7 +13,7 @@ const corridorParams = [
   {
     name: "country",
     in: "query",
-    description: "Sending country (ISO 3166 alpha-2). Defaults to the corridor's main country. Live rates work from every listed country; history covers the main one only.",
+    description: "Sending country (ISO 3166 alpha-2). Defaults to the corridor's main country. Rates work from every listed country.",
     schema: { type: "string", example: "GB" },
   },
 ];
@@ -30,10 +30,7 @@ const error = {
   },
 };
 
-/** `2026-11-03`, or `2026-11-03T10:00:00Z`. */
-const dateOrTime = { anyOf: [{ type: "string", format: "date" }, { type: "string", format: "date-time" }] };
-
-const errors = { 400: error, 401: error, 403: error, 404: error, 429: error, 500: error, 503: error };
+const errors = { 400: error, 401: error, 403: error, 429: error, 500: error, 503: error };
 
 const ok = (description: string, schema: object) => ({ description, content: { "application/json": { schema } } });
 
@@ -63,7 +60,7 @@ export function openApiDocument(serverUrl: string) {
     info: {
       title: "Remittance Rate Comparator API",
       version: "1.0.0",
-      description: `Money transfer rates and fees to Bangladesh (BDT) and Pakistan (PKR) from the UK, eurozone, US and Canada, checked live from each provider's public calculator (callers within two minutes share one check). History: the last 30 days, hourly. Plans: ${plans}.`,
+      description: `Money transfer rates and fees to Bangladesh (BDT) and Pakistan (PKR) from the UK, eurozone, US and Canada, checked live from each provider's public calculator (callers within two minutes share one check). Plans: ${plans}.`,
     },
     servers: [{ url: serverUrl }],
     // Either header works.
@@ -81,7 +78,7 @@ export function openApiDocument(serverUrl: string) {
     paths: {
       "/api/v1/corridors": {
         get: {
-          summary: "Corridors, their sending countries, and which have history",
+          summary: "Corridors and their sending countries",
           responses: { 200: ok("Corridors", { type: "object" }), ...errors },
         },
       },
@@ -139,19 +136,6 @@ export function openApiDocument(serverUrl: string) {
             { name: "newCustomer", in: "query", description: "Price with first-transfer deals.", schema: { type: "boolean", default: false } },
           ],
           responses: { 200: ok("Ranked offers, best rate first", { type: "object" }), ...errors },
-        },
-      },
-      "/api/v1/history": {
-        get: {
-          summary: "Headline rate history per provider over the last 30 days: hourly, or daily open/high/low/close",
-          parameters: [
-            ...corridorParams,
-            { name: "interval", in: "query", description: "`day` gives open, high, low and close per UTC day, and widens the range to whole days.", schema: { type: "string", enum: ["hour", "day"], default: "hour" } },
-            { name: "since", in: "query", description: "A date, or a date and time with Z or an offset. Default: 7 days before `until`. Moved up to 30 days ago at the earliest (`limited: true`).", schema: dateOrTime },
-            { name: "until", in: "query", description: "A date, or a date and time with Z or an offset; a date alone includes that whole day. Default: now.", schema: dateOrTime },
-            { name: "provider", in: "query", schema: { type: "string" } },
-          ],
-          responses: { 200: ok("History", { type: "object" }), ...errors },
         },
       },
       "/api/v1/usage": {

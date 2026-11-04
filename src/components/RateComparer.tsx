@@ -3,15 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { availableMethods, buildOffers, mostReceived, type Offer } from "@/lib/compare";
 import {
-  appendRecord,
-  bestRateTrend,
-  providerTrend,
-  toRecord,
-  type History,
-  type HistoryRecord,
-  type TrendPoint,
-} from "@/lib/history";
-import {
   CORRIDORS,
   COUNTRIES,
   DEFAULT_CORRIDOR,
@@ -26,13 +17,13 @@ import {
   type ReceiveCurrency,
 } from "@/lib/corridors";
 import { currencySymbol, formatAgo, formatMoney, formatRate, formatReceive } from "@/lib/format";
+import { corridorHeadline } from "@/lib/headline";
 import { isValidAmount, linkQuery, shareQuery, type Home, type LinkState } from "@/lib/link";
 import { AUTHOR, REPO_URL, SITE_NAME } from "@/lib/site";
 import type { DeliveryMethod, ProviderResult, RatesEvent, RatesSnapshot } from "@/lib/types";
 import Image from "next/image";
 import { Rosette, Waves } from "./Guilloche";
 import { ProviderLogo } from "./ProviderLogo";
-import { Sparkline } from "./Sparkline";
 import { useFlip } from "./useFlip";
 import { useNow } from "./useNow";
 
@@ -50,15 +41,9 @@ function methodPayout(method: DeliveryMethod, to: ReceiveCurrency): string {
 /** After this long, a banner suggests refreshing because providers may have moved their rates. */
 const STALE_AFTER_MINUTES = 10;
 
-// rank · logo · service · [7-day trend] · rate · fee · recipient gets. The trend column only
-// appears once there is history to show.
-function rowGrid(trends: boolean) {
-  return `grid grid-cols-[1.75rem_2.25rem_minmax(0,1fr)_auto] items-center gap-x-3 sm:gap-x-4 ${
-    trends
-      ? "sm:grid-cols-[2rem_2.5rem_minmax(0,1fr)_4.5rem_5.5rem_4rem_7.5rem]"
-      : "sm:grid-cols-[2rem_2.5rem_minmax(0,1fr)_6.5rem_5rem_8.5rem]"
-  }`;
-}
+// rank · logo · service · rate · fee · recipient gets
+const ROW_GRID =
+  "grid grid-cols-[1.75rem_2.25rem_minmax(0,1fr)_auto] items-center gap-x-3 sm:gap-x-4 sm:grid-cols-[2rem_2.5rem_minmax(0,1fr)_6.5rem_5rem_8.5rem]";
 
 const CHIP =
   "inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1 text-sm transition hover:border-brand";
@@ -78,6 +63,7 @@ export function RateComparer({
   providerCounts,
   initial,
   home,
+  titled,
 }: {
   /** How many providers serve each corridor and sending country, keyed "EUR-BDT:ES". */
   providerCounts: Record<string, number>;
@@ -85,6 +71,8 @@ export function RateComparer({
   initial: LinkState;
   /** The visitor's own currency and country, from their location; links leave these out. */
   home: Home;
+  /** The corridor and country the server's title names, keyed "EUR-BDT:IT"; null for a title naming none. */
+  titled: string | null;
 }) {
   const countFor = (c: Corridor) => providerCounts[`${c.id}:${c.sendCountry}`] ?? 0;
   const startsOnServedCorridor = countFor(inCountry(getCorridor(initial.corridorId)!, initial.country)) > 0;
@@ -96,8 +84,6 @@ export function RateComparer({
   );
   const baseCorridor = getCorridor(corridorId)!;
   const corridor = inCountry(baseCorridor, country);
-  // History is only recorded for each corridor's default sending country.
-  const isDefaultCountry = corridor.sendCountry === baseCorridor.sendCountry;
   const currency = corridor.from;
   const receiveCurrency = corridor.to;
   const destination = destinationOf(corridor);
@@ -136,17 +122,20 @@ export function RateComparer({
   const listRef = useRef<HTMLOListElement>(null);
   useFlip(listRef, offers.map((o) => o.provider.id).join());
 
-  // Hourly history plus the rates on screen (once the check is complete), so each trend ends at "now".
-  const [historyByCorridor, setHistoryByCorridor] = useState<Record<string, HistoryRecord[]>>({});
-  const history = isDefaultCountry ? (historyByCorridor[corridorId] ?? []) : [];
-  const records = snapshot && !loading ? appendRecord(history, toRecord(snapshot)) : history;
-  const trends = new Map(
-    now === null ? [] : offers.map((o) => [o.provider.id, providerTrend(records, o.provider.id, now)] as const),
-  );
-  // Wait for half a day of history before showing trends; a line over an hour or two says nothing.
-  const showTrends = [...trends.values()].some((t) => t.length > 1 && t.at(-1)!.t - t[0].t >= 12 * 3_600_000);
-  const bestTrend = now === null ? [] : bestRateTrend(records, now);
-  const trendDays = bestTrend.length > 1 ? Math.round((bestTrend.at(-1)!.t - bestTrend[0].t) / 86_400_000) : 0;
+  // The server titles the page after the link it was opened with. Picking another corridor here doesn't
+  // reload it, so the tab title follows along, and going back to the first one restores the server's
+  // title. Search bots that run scripts never pick anything, so "/" keeps its generic title for them.
+  // The server's title is only kept when it doesn't name another corridor or country than the page
+  // shows: a Spanish visitor on /?from=EUR&to=BDT starts on Spain, though the title names Italy.
+  const startTitle = useRef<{ key: string; title: string } | null>(null);
+  useEffect(() => {
+    const key = `${corridorId}:${country}`;
+    startTitle.current ??= { key, title: document.title };
+    document.title =
+      key === startTitle.current.key && (titled === null || titled === key)
+        ? startTitle.current.title
+        : `${corridorHeadline(getCorridor(corridorId)!, country)} | ${SITE_NAME}`;
+  }, [corridorId, country, titled]);
 
   const failed = snapshot?.providers.filter((p) => p.status === "error") ?? [];
   const noMethod =
@@ -157,17 +146,6 @@ export function RateComparer({
   const pendingNew = (progress?.total ?? countFor(corridor)) - (snapshot?.providers.length ?? 0);
   const isStale =
     !loading && snapshot !== null && now !== null && now - Date.parse(snapshot.updatedAt) > STALE_AFTER_MINUTES * 60_000;
-
-  useEffect(() => {
-    let current = true;
-    fetch(`/api/history?corridor=${corridorId}`)
-      .then((res) => (res.ok ? (res.json() as Promise<History>) : { records: [] }))
-      .then((h) => current && setHistoryByCorridor((all) => ({ ...all, [corridorId]: h.records })))
-      .catch(() => {});
-    return () => {
-      current = false;
-    };
-  }, [corridorId]);
 
   // Rates stream in one provider at a time, so the list fills in as answers arrive instead of
   // waiting for the slowest service. Bumping `requestId` (the Refresh button) runs it again;
@@ -486,16 +464,13 @@ export function RateComparer({
           </p>
         </div>
 
-        {trendDays >= 1 && <BestRateSummary points={bestTrend} days={Math.min(trendDays, 7)} />}
-
         {offers.length > 0 && (
           <div
-            className={`${rowGrid(showTrends)} hidden px-3 pb-1 pt-4 text-xs font-medium uppercase tracking-wider text-muted sm:grid`}
+            className={`${ROW_GRID} hidden px-3 pb-1 pt-4 text-xs font-medium uppercase tracking-wider text-muted sm:grid`}
           >
             <span />
             <span />
             <span>Service</span>
-            {showTrends && <span>7 days</span>}
             <span className="text-right">Rate</span>
             <span className="text-right">Fee</span>
             <span className="text-right">Recipient gets</span>
@@ -511,7 +486,6 @@ export function RateComparer({
               isMostReceived={offer.provider.id === mostReceivedId}
               currency={currency}
               receiveCurrency={receiveCurrency}
-              trend={showTrends ? (trends.get(offer.provider.id) ?? []) : undefined}
             />
           ))}
         </ol>
@@ -630,15 +604,12 @@ function OfferRow({
   isMostReceived,
   currency,
   receiveCurrency,
-  trend,
 }: {
   offer: Offer;
   rank: number;
   isMostReceived: boolean;
   currency: string;
   receiveCurrency: ReceiveCurrency;
-  /** Set when the trend column is shown; may be too short to draw for a provider. */
-  trend?: TrendPoint[];
 }) {
   const { provider, quote } = offer;
   const top = rank === 1;
@@ -659,7 +630,7 @@ function OfferRow({
         href={provider.url}
         target="_blank"
         rel="noopener noreferrer"
-        className={`${rowGrid(trend !== undefined)} group rounded-2xl px-3 transition ${top ? "py-6 focus-visible:outline-note-ink" : "py-4 hover:bg-card"}`}
+        className={`${ROW_GRID} group rounded-2xl px-3 transition ${top ? "py-6 focus-visible:outline-note-ink" : "py-4 hover:bg-card"}`}
       >
         <span
           className={`figure grid place-items-center rounded-full font-semibold ${
@@ -698,12 +669,6 @@ function OfferRow({
             {provider.note}
           </span>
         </span>
-
-        {trend !== undefined && (
-          <span className="hidden sm:block">
-            <Sparkline points={trend} onNote={top} />
-          </span>
-        )}
 
         <span className={`figure text-right font-semibold ${top ? "text-3xl sm:text-4xl" : "text-2xl"}`}>
           {formatRate(offer.rate)}
@@ -762,36 +727,13 @@ function Select({
   );
 }
 
-/** Answers "is today a good day to send?" by placing the current best rate in its recent range. */
-function BestRateSummary({ points, days }: { points: TrendPoint[]; days: number }) {
-  const rates = points.map((p) => p.rate);
-  const now = rates.at(-1)!;
-  const lo = Math.min(...rates);
-  const hi = Math.max(...rates);
-  const span = days === 1 ? "day" : `${days} days`;
-  const text =
-    hi === lo
-      ? `The best rate hasn't moved in the last ${span}.`
-      : now >= hi
-        ? `Today's best rate is the highest in the last ${span}.`
-        : now <= lo
-          ? `Today's best rate is the lowest in the last ${span}.`
-          : `Best rate over the last ${span}: ${formatRate(lo)} to ${formatRate(hi)}.`;
-  return (
-    <p className="flex items-center gap-3 px-3 pt-4 text-sm text-muted">
-      <Sparkline points={points} />
-      {text}
-    </p>
-  );
-}
-
 function LoadingRows({ rows, label }: { rows: number; label: string }) {
   return (
     <div aria-busy="true">
       <p className="px-3 pb-2 pt-4 text-sm text-muted">{label}</p>
       <ul aria-hidden="true" className="flex flex-col gap-1">
         {Array.from({ length: rows }, (_, i) => (
-          <li key={i} className={`${rowGrid(false)} border-b border-line px-3 py-4`}>
+          <li key={i} className={`${ROW_GRID} border-b border-line px-3 py-4`}>
             <span className="mx-auto size-2 rounded-full bg-line" />
             <span className="size-9 rounded-xl bg-line motion-safe:animate-pulse" />
             <span className="flex flex-col gap-2">

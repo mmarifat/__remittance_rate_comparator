@@ -37,13 +37,8 @@ The logo is a ranked list in miniature: three routes, shortest at the bottom, wi
 - Amounts are compared for the same total spend: the fee comes out of what you pay, and the rest is converted.
 - Providers can attach a first-transfer deal to a quote (a better rate, a lower fee, and how much the better rate covers). With "I'm a new customer" on, the list ranks by those; a deal capped at, say, the first €500 is blended with the regular rate for the rest.
 - Visitors start on their own currency: the page reads Vercel's `x-vercel-ip-country` header, so someone in Italy lands on EUR from Italy, in the US on USD, and so on (other eurozone countries get euro prices from Italy; visitors in Pakistan start on GBP to PKR; everywhere else starts on GBP to BDT). A shared link's choices always win.
+- Nothing runs on a schedule. Providers are asked only when someone opens the page, presses Refresh or calls the API, so rates are never stored or scanned in the background.
 - The currencies, country, amount, payout method and new-customer choice are kept in the address (`?from=EUR&to=PKR&country=ES&amount=500&method=wallet&new=1`), so a comparison can be shared as a link.
-
-### Rate history and provider health
-
-`.github/workflows/rate-history.yml` runs every hour. It reads the live site's `/api/rates` (so it adds no load on providers), appends each provider's headline rate to one file per corridor in [`history/` on the `data` branch](../../tree/data/history), and keeps 30 days. Euro history is recorded for Italy only, so trends appear there. The page shows the last 7 days as a trend per provider, served through `/api/history`. The [API](docs/api.md)'s history reads the same files.
-
-The same job watches provider health: if a provider fails every check for 6 hours, it opens a GitHub issue labelled `provider-health`, and closes it when the provider answers again.
 
 Some services are covered through another source when their own calculator is unavailable:
 

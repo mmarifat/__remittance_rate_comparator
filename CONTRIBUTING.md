@@ -2,7 +2,7 @@
 
 Thanks for helping people get more taka and rupees for their money. The most useful contributions are:
 
-- **Fixing a broken provider.** Providers change their websites, and a provider that stops answering shows up under "Couldn't check just now". After 6 hours of failures, an issue labelled [`provider-health`](../../issues?q=label%3Aprovider-health) opens automatically; those are good first issues.
+- **Fixing a broken provider.** Providers change their websites, and a provider that stops answering shows up under "Couldn't check just now". Run `bun run check:providers <corridor>` to see which one broke, or report it with the [Broken provider](../../issues/new?template=broken-provider.yml) issue template; those are good first issues.
 - **Adding a provider** that sends money to Bangladesh or Pakistan from the UK, eurozone, US or Canada.
 - **Adding a corridor to a provider** that already serves it but isn't switched on here yet.
 - **Improving the page**: accessibility, layout, wording.

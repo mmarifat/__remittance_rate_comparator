@@ -1,4 +1,3 @@
-import { getCorridor, type Corridor } from "../corridors";
 import type { ProviderResult, RatesSnapshot } from "../types";
 
 /**
@@ -19,12 +18,4 @@ export const servedByApi = (provider: Pick<ProviderResult, "id">) => !API_EXCLUD
 
 export function forApi(snapshot: RatesSnapshot): RatesSnapshot {
   return { ...snapshot, providers: snapshot.providers.filter(servedByApi) };
-}
-
-/**
- * Whether a corridor has hourly history: the data-branch job records each corridor from its main
- * sending country only. Live rates work from every sending country.
- */
-export function hasHistory(corridor: Corridor): boolean {
-  return getCorridor(corridor.id)?.sendCountry === corridor.sendCountry;
 }

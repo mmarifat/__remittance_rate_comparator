@@ -1,20 +1,15 @@
 import { usageByDay, utcDay } from "@/db/tenants";
 import { buildOffers, mostReceived } from "../compare";
-import { COUNTRIES, CORRIDORS, destinationOf, getCorridor, inCountry, type Corridor } from "../corridors";
-import { dailySummary } from "../history";
-import { loadHistory } from "../historySource";
+import { COUNTRIES, CORRIDORS, destinationOf, inCountry, type Corridor } from "../corridors";
 import { sharedCheck } from "../liveCheck";
 import { providers as registry } from "../providers";
 import { supports, toSnapshot } from "../snapshot";
 import type { ProviderResult, RatesSnapshot } from "../types";
 import type { ApiContext } from "./handler";
-import { ApiError } from "./http";
-import { amountParam, booleanParam, corridorParam, dateParam, methodParam } from "./params";
-import { forApi, hasHistory, servedByApi } from "./policy";
+import { amountParam, booleanParam, corridorParam, methodParam } from "./params";
+import { forApi, servedByApi } from "./policy";
 
-const DAY_MS = 86_400_000;
 const round = (n: number, places: number) => Math.round(n * 10 ** places) / 10 ** places;
-const nameOf = new Map(registry.map((p) => [p.id, p.name]));
 
 function corridorSummary(corridor: Corridor) {
   const destination = destinationOf(corridor);
@@ -69,7 +64,6 @@ export async function listCorridors() {
           code,
           name: COUNTRIES[code].name,
           default: code === c.sendCountry,
-          history: hasHistory(corridor),
           providers: registry.filter((p) => servedByApi(p) && supports(p, corridor)).length,
         };
       }),
@@ -141,75 +135,6 @@ export async function compare(ctx: ApiContext) {
         reason: p.status === "error" ? "unavailable" : p.quotes.some((q) => q.method === method) ? "fee_exceeds_amount" : "method_not_offered",
       })),
   };
-}
-
-/** The data branch keeps 30 days of hourly records. */
-const HISTORY_DAYS = 30;
-
-/**
- * GET /api/v1/history?corridor=GBP-PKR&interval=hour|day&since=…&until=…&provider=wise
- * Each provider's headline rate, from the hourly records on the data branch (the last 30 days).
- */
-export async function history(ctx: ApiContext) {
-  const corridor = corridorParam(ctx.params);
-  if (!hasHistory(corridor)) {
-    throw new ApiError(404, "not_tracked", `${corridor.id} history is recorded for sending from ${getCorridor(corridor.id)!.sendCountry} only.`);
-  }
-  const interval = ctx.params.get("interval") ?? "hour";
-  if (interval !== "hour" && interval !== "day") throw new ApiError(400, "invalid_interval", "interval must be hour or day.");
-  const provider = ctx.params.get("provider") ?? undefined;
-  if (provider && (!nameOf.has(provider) || !servedByApi({ id: provider }))) {
-    throw new ApiError(400, "invalid_provider", `Unknown provider "${provider}". GET /api/v1/providers lists them.`);
-  }
-
-  // The range is since/until, because from/to name the currencies on every endpoint.
-  const now = Date.now();
-  let until = dateParam(ctx.params, "until", { endOfDay: true }) ?? new Date(now);
-  const requestedSince = dateParam(ctx.params, "since") ?? new Date(until.getTime() - 7 * DAY_MS);
-  if (requestedSince > until) throw new ApiError(400, "invalid_range", "since must be before until.");
-  // History goes back 30 days; earlier dates are moved up to that.
-  const earliest = new Date(now - HISTORY_DAYS * DAY_MS);
-  if (until < earliest) {
-    throw new ApiError(400, "range_outside_history", `History covers the last ${HISTORY_DAYS} days, from ${earliest.toISOString()}.`);
-  }
-  const limited = requestedSince < earliest;
-  let since = limited ? earliest : requestedSince;
-  if (interval === "day") {
-    // Whole UTC days: until on to the end of its day, and since back to the start of its day, or on to the
-    // next day's where history begins mid-day (unless that first day is all that's asked for).
-    until = new Date(Math.floor(until.getTime() / DAY_MS) * DAY_MS + DAY_MS - 1);
-    const dayStart = Math.floor(since.getTime() / DAY_MS) * DAY_MS;
-    const start = dayStart < earliest.getTime() ? dayStart + DAY_MS : dayStart;
-    if (start <= until.getTime()) since = new Date(start);
-  }
-  const range = { since: since.toISOString(), until: until.toISOString(), limited };
-  const base = { ...corridorSummary(corridor), interval, ...range };
-
-  const inRange = (await loadHistory(corridor.id)).filter((r) => {
-    const t = Date.parse(r.t);
-    return t >= since.getTime() && t <= until.getTime();
-  });
-  // Only the asked-for provider, and never one the API leaves out.
-  const records = inRange.map((r) => ({
-    ...r,
-    r: Object.fromEntries(Object.entries(r.r).filter(([id]) => servedByApi({ id }) && (!provider || id === provider))),
-  }));
-
-  // Every provider in the range gets a series, even one that never answered (no points).
-  const ids = [...new Set(records.flatMap((r) => Object.keys(r.r)))].sort();
-  const series = (pointsOf: (id: string) => unknown[]) =>
-    ids.map((id) => ({ provider: { id, name: nameOf.get(id) ?? id }, points: pointsOf(id) }));
-
-  if (interval === "hour") {
-    return {
-      ...base,
-      midMarket: records.flatMap((r) => (r.mid == null ? [] : [{ t: r.t, rate: r.mid }])),
-      series: series((id) => records.flatMap((r) => (r.r[id] == null ? [] : [{ t: r.t, rate: r.r[id] }]))),
-    };
-  }
-
-  const daily = dailySummary(records);
-  return { ...base, midMarket: daily.midMarket, series: series((id) => daily.providers.get(id) ?? []) };
 }
 
 /** GET /api/v1/usage */

@@ -7,7 +7,7 @@ import type { RatesSnapshot } from "./types";
 export const CACHE_SECONDS = 120;
 const CACHE_MS = CACHE_SECONDS * 1000;
 
-// Two layers, so the page, the API and the hourly history job share checks:
+// Two layers, so the page and the API share checks:
 // - In this server instance, concurrent and back-to-back callers share one check, even while it's running.
 // - Across instances, through Vercel's Runtime Cache (regional, read by every function). An instance about
 //   to check a corridor first leaves a marker there; others that find it wait for that check's result

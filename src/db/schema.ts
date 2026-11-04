@@ -1,8 +1,7 @@
 import { date, index, integer, pgEnum, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 // The database holds API customers only: organizations, their keys, and usage counters. Rates are
-// checked live (sharing the comparison page's short cache) and never stored here; hourly history
-// lives on the repository's data branch.
+// checked live (sharing the comparison page's short cache) and never stored anywhere.
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 

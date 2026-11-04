@@ -5,9 +5,8 @@ import * as t from "@/db/schema";
 import { createApiKey, createOrganization, usageByDay, utcDay } from "@/db/tenants";
 import { testDb } from "@/db/testing";
 import type { Corridor } from "../corridors";
-import type { HistoryRecord } from "../history";
 import type { ProviderResult, RatesSnapshot } from "../types";
-import { compare, history, listCorridors, listProviders, rates, usage } from "./endpoints";
+import { compare, listCorridors, listProviders, rates, usage } from "./endpoints";
 import { apiRoute } from "./handler";
 
 const ok = (id: string, rate: number, fee: number, extra: Partial<ProviderResult> = {}): ProviderResult => ({
@@ -38,7 +37,7 @@ function snapshotAt(updatedAt: string): RatesSnapshot {
   };
 }
 
-// The live check and the data-branch history stand in for real providers and GitHub.
+// The live check stands in for real providers.
 const live = vi.hoisted(() => ({ snapshot: undefined as RatesSnapshot | undefined, asked: [] as string[] }));
 vi.mock("@/lib/liveCheck", () => ({
   sharedCheck: async (corridor: Corridor) => {
@@ -52,8 +51,6 @@ vi.mock("@/lib/liveCheck", () => ({
     };
   },
 }));
-const stored = vi.hoisted(() => ({ records: [] as HistoryRecord[] }));
-vi.mock("@/lib/historySource", () => ({ loadHistory: async () => stored.records }));
 
 let db: Db;
 let key: string;
@@ -131,13 +128,13 @@ describe("authentication", () => {
 });
 
 describe("catalogue", () => {
-  it("lists every corridor with its sending countries and which have history", async () => {
+  it("lists every corridor with its sending countries", async () => {
     const body = await (await call(listCorridors, "/api/v1/corridors")).json();
     const gbpPkr = body.corridors.find((c: { id: string }) => c.id === "GBP-PKR");
     expect(gbpPkr.receiveCountry).toEqual({ code: "PK", name: "Pakistan" });
-    expect(gbpPkr.sendCountries[0]).toMatchObject({ code: "GB", default: true, history: true });
+    expect(gbpPkr.sendCountries[0]).toMatchObject({ code: "GB", default: true });
     const eurPkr = body.corridors.find((c: { id: string }) => c.id === "EUR-PKR");
-    expect(eurPkr.sendCountries.find((c: { code: string }) => c.code === "ES")).toMatchObject({ history: false });
+    expect(eurPkr.sendCountries.find((c: { code: string }) => c.code === "ES")).toMatchObject({ default: false });
   });
 
   it("lists providers for a corridor, leaving out excluded ones", async () => {
@@ -200,82 +197,6 @@ describe("rates and compare", () => {
       expect([res.status, (await res.json()).error.code]).toEqual([400, code]);
     }
     expect(live.asked).toEqual([]);
-  });
-});
-
-describe("history", () => {
-  const hour = 3_600_000;
-  beforeEach(() => {
-    const base = Date.now() - 3 * hour;
-    stored.records = [0, 1, 2].map((i) => ({
-      t: new Date(base + i * hour).toISOString(),
-      mid: 373 + i,
-      r: { wise: 373 + i, remitly: 371, xe: 380, moneygram: null },
-    }));
-  });
-
-  it("returns hourly series per provider and daily summaries, without excluded providers", async () => {
-    const hourly = await (await call(history, "/api/v1/history?from=GBP&to=PKR&provider=wise")).json();
-    expect(hourly).toMatchObject({ interval: "hour", corridor: "GBP-PKR", from: "GBP", to: "PKR" });
-    expect(hourly.series).toEqual([{ provider: { id: "wise", name: "Wise" }, points: expect.any(Array) }]);
-    expect(hourly.series[0].points).toHaveLength(3);
-    expect(hourly.midMarket).toHaveLength(3);
-
-    const all = await (await call(history, "/api/v1/history?corridor=GBP-PKR")).json();
-    expect(all.series.map((s: { provider: { id: string } }) => s.provider.id)).toEqual(["moneygram", "remitly", "wise"]);
-    expect(all.series[0].points).toEqual([]); // MoneyGram never answered
-
-    const daily = await (await call(history, "/api/v1/history?corridor=GBP-PKR&interval=day")).json();
-    const ids = daily.series.map((s: { provider: { id: string } }) => s.provider.id);
-    expect(ids).toEqual(["moneygram", "remitly", "wise"]);
-    expect(daily.series[0].points).toEqual([]);
-    const wise = daily.series.find((s: { provider: { id: string } }) => s.provider.id === "wise");
-    expect(wise.points.reduce((n: number, p: { samples: number }) => n + p.samples, 0)).toBe(3);
-  });
-
-  it("gives whole UTC days, and takes a date alone as the whole of that day", async () => {
-    const today = utcDay(new Date());
-    const daily = await (await call(history, "/api/v1/history?corridor=GBP-PKR&interval=day")).json();
-    expect(daily.since).toBe(`${utcDay(new Date(Date.now() - 7 * 86_400_000))}T00:00:00.000Z`);
-    expect(daily.limited).toBe(false);
-
-    const sinceDay = utcDay(new Date(Date.now() - 2 * 86_400_000));
-    const byDate = await (await call(history, `/api/v1/history?corridor=GBP-PKR&since=${sinceDay}&until=${today}`)).json();
-    expect([byDate.since, byDate.until]).toEqual([`${sinceDay}T00:00:00.000Z`, `${today}T23:59:59.999Z`]);
-    expect(byDate.series.find((s: { provider: { id: string } }) => s.provider.id === "wise").points.length).toBeGreaterThan(0);
-
-    // A time is kept as given for hourly history, and widened to the whole day for daily history.
-    const at = `${sinceDay}T10:30:00Z`;
-    const hourly = await (await call(history, `/api/v1/history?corridor=GBP-PKR&since=${sinceDay}&until=${at}`)).json();
-    expect(hourly.until).toBe(`${sinceDay}T10:30:00.000Z`);
-    const daily2 = await (await call(history, `/api/v1/history?corridor=GBP-PKR&interval=day&since=${at}&until=${at}`)).json();
-    expect([daily2.since, daily2.until]).toEqual([`${sinceDay}T00:00:00.000Z`, `${sinceDay}T23:59:59.999Z`]);
-  });
-
-  it("takes strict ISO 8601 dates, including an offset whose + wasn't encoded", async () => {
-    const day = utcDay(new Date(Date.now() - 86_400_000));
-    const offset = await (await call(history, `/api/v1/history?corridor=GBP-PKR&since=${day}T10:00:00+05:00`)).json();
-    expect(offset.since).toBe(`${day}T05:00:00.000Z`);
-    for (const bad of ["2026-02-30", "2026/10/31", `${day}T10:00`, "Nov 1 2026", "0"]) {
-      const res = await call(history, `/api/v1/history?corridor=GBP-PKR&since=${encodeURIComponent(bad)}`);
-      expect([res.status, (await res.json()).error.code]).toEqual([400, "invalid_since"]);
-    }
-  });
-
-  it("covers the last 30 days, from the main sending country only", async () => {
-    const body = await (await call(history, "/api/v1/history?corridor=GBP-PKR&interval=day&since=2020-01-01")).json();
-    expect(body.limited).toBe(true);
-    // History begins mid-day 30 days ago, so the first whole day starts the next midnight.
-    expect(body.since).toBe(`${utcDay(new Date(Date.now() - 29 * 86_400_000))}T00:00:00.000Z`);
-
-    const backwards = await call(history, "/api/v1/history?corridor=GBP-PKR&since=2026-11-03&until=2026-11-01");
-    expect([backwards.status, (await backwards.json()).error.code]).toEqual([400, "invalid_range"]);
-    const outside = await call(history, "/api/v1/history?corridor=GBP-PKR&since=2020-01-01&until=2020-06-01");
-    expect([outside.status, (await outside.json()).error.code]).toEqual([400, "range_outside_history"]);
-    const spain = await call(history, "/api/v1/history?corridor=EUR-PKR&country=ES");
-    expect([spain.status, (await spain.json()).error.code]).toEqual([404, "not_tracked"]);
-    const unknown = await call(history, "/api/v1/history?corridor=GBP-PKR&provider=nope");
-    expect((await unknown.json()).error.code).toBe("invalid_provider");
   });
 });
 

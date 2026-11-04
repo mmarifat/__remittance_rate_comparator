@@ -1,6 +1,6 @@
 /**
  * What each plan allows. An organization's `plan` column names one of these. The numbers are a
- * starting point; pricing isn't decided yet. History is the same for everyone: the last 30 days.
+ * starting point; pricing isn't decided yet.
  */
 export const PLANS = {
   free: { name: "Free", requestsPerMinute: 30, requestsPerMonth: 10_000 },
