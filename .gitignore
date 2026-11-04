@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# claude code: per-machine files (session worktrees, the app's preview servers, personal settings).
+# Shared settings, agents and commands under .claude/ can still be committed.
+/.claude/worktrees/
+/.claude/launch.json
+/.claude/settings.local.json
