@@ -55,15 +55,11 @@ export const apiUsageDaily = pgTable(
   (t) => [primaryKey({ columns: [t.apiKeyId, t.day] }), index("api_usage_daily_organization").on(t.organizationId, t.day)],
 );
 
-/** Requests per key per minute, for rate limiting. Rows older than a day are pruned. */
-export const apiRateWindows = pgTable(
-  "api_rate_windows",
-  {
-    apiKeyId: uuid("api_key_id")
-      .notNull()
-      .references(() => apiKeys.id, { onDelete: "cascade" }),
-    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
-    requests: integer().notNull().default(0),
-  },
-  (t) => [primaryKey({ columns: [t.apiKeyId, t.windowStart] })],
-);
+/** Each key's requests in its latest minute, for rate limiting. One row per key, overwritten as minutes pass, so it never grows. */
+export const apiRateWindows = pgTable("api_rate_windows", {
+  apiKeyId: uuid("api_key_id")
+    .primaryKey()
+    .references(() => apiKeys.id, { onDelete: "cascade" }),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  requests: integer().notNull().default(0),
+});

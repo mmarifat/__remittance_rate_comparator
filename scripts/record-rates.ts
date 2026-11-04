@@ -10,6 +10,7 @@ import type { RatesSnapshot } from "../src/lib/types";
 
 const SITE_URL = process.env.SITE_URL ?? "https://remittance-rate-comparator.vercel.app";
 const LABEL = "provider-health";
+const PAUSE_BETWEEN_CORRIDORS_MS = 60_000;
 const dir = process.argv[2] ?? "history";
 mkdirSync(dir, { recursive: true });
 
@@ -18,7 +19,9 @@ let failures = 0;
 
 // Each corridor is independent: one that fails is logged and skipped, and the rest are still recorded
 // and committed by the workflow.
-for (const corridor of CORRIDORS) {
+for (const [i, corridor] of CORRIDORS.entries()) {
+  // Spread out, since a check asks every provider and some block a burst (TransferGo for up to an hour).
+  if (i > 0) await new Promise((resolve) => setTimeout(resolve, PAUSE_BETWEEN_CORRIDORS_MS));
   try {
     const res = await fetch(`${SITE_URL}/api/rates?corridor=${corridor.id}`, { signal: AbortSignal.timeout(60_000) });
     if (!res.ok) throw new Error(`HTTP ${res.status} from /api/rates`);

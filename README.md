@@ -74,7 +74,7 @@ The API needs Postgres; see [docs/api.md](docs/api.md#running-it). `bun run test
 
 ## Deploy (Vercel)
 
-The live site deploys from `main` automatically. To run your own copy, import the repo at [vercel.com/new](https://vercel.com/new). The comparison page needs no environment variables. The API needs `DATABASE_URL` and `CRON_SECRET`; see [docs/api.md](docs/api.md#running-it).
+The live site deploys from `main` automatically. To run your own copy, import the repo at [vercel.com/new](https://vercel.com/new). The comparison page needs no environment variables. The API needs `DATABASE_URL`; see [docs/api.md](docs/api.md#running-it).
 
 `vercel.json` pins functions to London (`lhr1`) because some providers price by the caller's location.
 

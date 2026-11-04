@@ -13,10 +13,9 @@ CREATE TABLE "api_keys" (
 );
 --> statement-breakpoint
 CREATE TABLE "api_rate_windows" (
-	"api_key_id" uuid NOT NULL,
+	"api_key_id" uuid PRIMARY KEY NOT NULL,
 	"window_start" timestamp with time zone NOT NULL,
-	"requests" integer DEFAULT 0 NOT NULL,
-	CONSTRAINT "api_rate_windows_api_key_id_window_start_pk" PRIMARY KEY("api_key_id","window_start")
+	"requests" integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "api_usage_daily" (

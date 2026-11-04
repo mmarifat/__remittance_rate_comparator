@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, asc, eq, gt, gte, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, isNull, or, sql } from "drizzle-orm";
 import { isPlanId, planOf, type PlanId } from "../lib/api/plans";
 import type { Db } from "./client";
 import * as t from "./schema";
@@ -136,9 +136,13 @@ export async function recordRequest(db: Db, keyHash: string, now = new Date()): 
     db
       .insert(t.apiRateWindows)
       .values({ apiKeyId: found.keyId, windowStart, requests: 1 })
+      // A new minute starts the count again; a request that arrives late counts towards the latest minute.
       .onConflictDoUpdate({
-        target: [t.apiRateWindows.apiKeyId, t.apiRateWindows.windowStart],
-        set: { requests: sql`${t.apiRateWindows.requests} + 1` },
+        target: t.apiRateWindows.apiKeyId,
+        set: {
+          requests: sql`case when ${t.apiRateWindows.windowStart} < excluded.window_start then 1 else ${t.apiRateWindows.requests} + 1 end`,
+          windowStart: sql`greatest(${t.apiRateWindows.windowStart}, excluded.window_start)`,
+        },
       })
       .returning({ requests: t.apiRateWindows.requests }),
     // Everything the organization has used this month, all keys, before this request.
@@ -176,13 +180,4 @@ export async function usageByDay(db: Db, organizationId: string, fromDay: string
     .where(and(eq(t.apiUsageDaily.organizationId, organizationId), gte(t.apiUsageDaily.day, fromDay)))
     .groupBy(t.apiUsageDaily.day)
     .orderBy(asc(t.apiUsageDaily.day));
-}
-
-/** Rate-limit windows are only needed for the current minute; this clears out old ones. */
-export async function pruneRateWindows(db: Db, before: Date): Promise<number> {
-  const rows = await db
-    .delete(t.apiRateWindows)
-    .where(lt(t.apiRateWindows.windowStart, before))
-    .returning({ apiKeyId: t.apiRateWindows.apiKeyId });
-  return rows.length;
 }

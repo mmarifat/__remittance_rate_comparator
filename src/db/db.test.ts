@@ -38,6 +38,10 @@ describe("API customers", () => {
       { day: "2026-11-03", requests: 1 },
       { day: "2026-11-04", requests: 4 },
     ]);
+    // The rate-limit table keeps one row per key, however many minutes pass.
+    expect(await db.select().from(t.apiRateWindows).where(eq(t.apiRateWindows.apiKeyId, a.id))).toHaveLength(1);
+    // A request that arrives late counts towards the latest minute, rather than resetting it.
+    expect(await recordRequest(db, hashKey(a.key), at("2026-11-04T10:00:59Z"))).toMatchObject({ minuteRequests: 2 });
     // Last-used is written at most once a minute: 10:01:00 is only 30s after the 10:00:30 write.
     const [key] = await db.select().from(t.apiKeys).where(eq(t.apiKeys.id, a.id));
     expect(key.lastUsedAt?.toISOString()).toBe("2026-11-04T10:00:30.000Z");

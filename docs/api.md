@@ -118,20 +118,19 @@ Errors look like `{ "error": { "code": "invalid_amount", "message": "…" } }`.
 
 The API needs a Postgres database for its customers, keys and usage counters, nothing else, so it stays a few megabytes. On Vercel, add one from the Marketplace (Neon has a free plan), which sets `DATABASE_URL`. Any other Postgres works the same way: just set `DATABASE_URL`.
 
-1. Set `DATABASE_URL`, and set `CRON_SECRET` to a long random string, in the Vercel project.
-2. Pull the variables and create the tables:
+1. Pull the variables and create the tables:
    ```bash
    vercel env pull .env.local
    bun --env-file=.env.local run db:migrate
    ```
-3. Create a customer and a key. The key is shown once:
+2. Create a customer and a key. The key is shown once:
    ```bash
    bun --env-file=.env.local run admin create-org "SonaliPay" --plan pro
    bun --env-file=.env.local run admin create-key <organization id> "Production"
    ```
    `admin` also lists, revokes, changes plans and suspends. See the top of `scripts/admin.ts`.
 
-From then on, Vercel Cron calls `GET /api/internal/maintenance` daily with `CRON_SECRET` (see `vercel.json`) to clear old rate-limit counters. History needs nothing extra: the site's existing hourly job (`.github/workflows/rate-history.yml`) already writes it to the `data` branch.
+Nothing needs to run on a schedule for the API. History needs nothing extra: the site's existing hourly job (`.github/workflows/rate-history.yml`) already writes it to the `data` branch.
 
 Schema changes: edit `src/db/schema.ts`, run `bun run db:generate` to write a migration to `drizzle/`, commit it, and run `db:migrate` against the database before or as you deploy.
 
@@ -141,4 +140,4 @@ Schema changes: edit `src/db/schema.ts`, run `bun run db:generate` to write a mi
 | --- | --- |
 | `organizations`, `api_keys` | Customers and their keys. Only a SHA-256 hash of each key is stored |
 | `api_usage_daily` | Requests per key per UTC day: usage, and the basis for monthly quotas |
-| `api_rate_windows` | Requests per key per minute, for rate limiting. Cleared daily |
+| `api_rate_windows` | Each key's requests in its latest minute, for rate limiting. One row per key, overwritten |

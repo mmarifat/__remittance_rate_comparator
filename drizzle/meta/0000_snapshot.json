@@ -1,5 +1,5 @@
 {
-  "id": "444896d8-82ec-40ed-ba9e-42b045e515a8",
+  "id": "776683cf-8a67-46f3-bddd-7923e911e18b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -118,7 +118,7 @@
         "api_key_id": {
           "name": "api_key_id",
           "type": "uuid",
-          "primaryKey": false,
+          "primaryKey": true,
           "notNull": true
         },
         "window_start": {
@@ -151,15 +151,7 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {
-        "api_rate_windows_api_key_id_window_start_pk": {
-          "name": "api_rate_windows_api_key_id_window_start_pk",
-          "columns": [
-            "api_key_id",
-            "window_start"
-          ]
-        }
-      },
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
